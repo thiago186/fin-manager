@@ -128,6 +128,12 @@ mypy .
 alembic history --verbose
 ```
 
+## Package manager
+- Use `uv` as package manager.
+- Use `uv sync --all-groups` command for installing all dependencies of the project.
+- Use `uv add dependency` to add a dependency in the project, this will automatically update the pyproject.toml and the environment.
+- Don't use `uv pip` interface.
+
 ## Project coding standards
 - Use python sintax and bultins from python 3.11
 - Pefer a pythonic way of doing stuff. Use list comprehension always possible
