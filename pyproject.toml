@@ -18,3 +18,9 @@ dev = [
     "mypy>=1.16.1",
     "ruff>=0.12.0",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["ALL"]
+ignore = ["E501"]
