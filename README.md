@@ -1,6 +1,7 @@
 # Fin Manager
 
-This project provides a backend for a personal finance tracker.
+This project provides a backend for a personal finance tracker built with
+Django and the Django REST Framework (DRF).
 
 ## Development Setup
 
