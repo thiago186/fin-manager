@@ -22,5 +22,3 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Copy application code
 COPY . .
 
-# Default command
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
