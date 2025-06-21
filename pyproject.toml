@@ -5,12 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "alembic>=1.16.2",
-    "fastapi>=0.115.13",
+    "django>=5.2.3",
+    "djangorestframework>=3.16.0",
     "psycopg2-binary>=2.9.10",
-    "pydantic>=2.11.7",
-    "sqlmodel>=0.0.24",
-    "uvicorn>=0.34.3",
 ]
 
 [dependency-groups]
@@ -27,4 +24,4 @@ python_version = "3.11"
 ignore_missing_imports = true
 strict = true
 exclude = "migrations/*"
-packages = ["app"]
+packages = ["config", "api"]
