@@ -9,8 +9,9 @@ This project contains the code for the backend of a personal finance tracker sys
   - **Web Framework**: FastAPI (async, high performance)  
   - **ORM**: SQLModel (combines SQLAlchemy & Pydantic)  
   - **Auth**: JWT (OAuth2 Password Bearer)  
-  - **DB**: PostgreSQL (via `psycopg2`)  
+  - **DB**: PostgreSQL (via `psycopg2`)
   - **Migrations**: Alembic
+  - **Package Manager**: uv
 
 ## Project Structure for files Navigation
 ```
@@ -131,6 +132,9 @@ alembic history --verbose
 ## Project coding standards
 - Use python sintax and bultins from python 3.11
 - Pefer a pythonic way of doing stuff. Use list comprehension always possible
+- Use **uv** as the package manager for installing dependencies. Install new
+  packages with `uv add <dependency>` and avoid committing `requirements.txt`
+  files.
 
 ## PR instructions
 The PR should have this sections:
