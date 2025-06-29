@@ -77,7 +77,7 @@ class Account(models.Model):
 
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
-        return f"Account(id={self.id}, name='{self.name}', user_id={self.user_id}, balance={self.current_balance})"
+        return f"Account(id={self.pk}, name='{self.name}', user_id={self.user.pk}, balance={self.current_balance})"
 
     @property
     def formatted_balance(self) -> str:

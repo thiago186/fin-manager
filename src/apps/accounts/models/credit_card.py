@@ -59,7 +59,7 @@ class CreditCard(models.Model):
 
     def __repr__(self) -> str:
         """Detailed string representation for debugging."""
-        return f"CreditCard(id={self.id}, name='{self.name}', user_id={self.user_id}, close_date={self.close_date}, due_date={self.due_date})"
+        return f"CreditCard(id={self.pk}, name='{self.name}', user_id={self.user.pk}, close_date={self.close_date}, due_date={self.due_date})"
 
     def clean(self) -> None:
         """Validate the model fields."""
