@@ -12,6 +12,9 @@ This project contains the code for the backend of a personal finance tracker sys
   - **DB**: PostgreSQL
 
 ## Coding Conventions
+- **Python modules**:
+  - Always use absolute imports, never use relative impors. For example, use `from apps.users.models import User` instead of `from .models import User`.
+  - Never use in-function imports, always import at the top of the file.
 - **Package manager**: 
   - Use `uv` for package management.
   - Always use `uv add <package>` to add a package. Don't use `pip` or `pipenv`.
@@ -27,6 +30,7 @@ This project contains the code for the backend of a personal finance tracker sys
   - DB tables mirror model names (e.g., `users`, `accounts`).
 - **Running django commands**:
   - For running django commands, use `uv run python src/manage.py <djangocommand>`, like `uv run python src/manage.py makemigrations`.
+  - All django apps are inside the `src/apps` folder. If you want to create a new app, create it inside this structure. Also, manually change the `ApiConfig.name` from `name="module"` to `name="apps.module"` inside the `apps.py` file. Also include `apps.module` in the `INSTALLED_APPS` list in `src/fin_manager/settings.py`.
 
 ## Testing Requirements
 - Create only simple unit tests.
