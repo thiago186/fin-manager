@@ -39,10 +39,23 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "drf_spectacular",
     "pytest_django",
     "apps.users",
     "apps.api",
 ]
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Fin Manager API",
+    "DESCRIPTION": "API for the Fin Manager personal finance tracker system",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
