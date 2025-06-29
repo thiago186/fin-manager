@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+- Create only simple unit tests.
+- Use `pytest` for testing.
+- Create always functions to test. Don't use class-based tests.
+- Use fixtures and monkeypatching always needed.
