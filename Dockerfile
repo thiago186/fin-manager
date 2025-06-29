@@ -8,8 +8,8 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=0 \
     UV_PYTHON_VERSION=3.11
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+COPY pyproject.toml pyproject.toml
 COPY . .
+    
+RUN uv sync
 RUN chmod +x /app/entrypoint.sh

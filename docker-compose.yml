@@ -15,10 +15,8 @@ services:
     image: postgres:15-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_DB=fin_tracker
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
+    env_file:
+      - .env
 
 volumes:
   postgres_data:
