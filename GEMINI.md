@@ -31,6 +31,8 @@ This project contains the code for the backend of a personal finance tracker sys
 - **Running django commands**:
   - For running django commands, use `uv run python src/manage.py <djangocommand>`, like `uv run python src/manage.py makemigrations`.
   - All django apps are inside the `src/apps` folder. If you want to create a new app, create it inside this structure. Also, manually change the `ApiConfig.name` from `name="module"` to `name="apps.module"` inside the `apps.py` file. Also include `apps.module` in the `INSTALLED_APPS` list in `src/fin_manager/settings.py`.
+  - When creating urls, use kebab-case only for the url name.
+  - Always ensure new API routes are documented using `drf-spectacular` for Swagger UI generation.
 
 ## Testing Requirements
 - Create only simple unit tests.
