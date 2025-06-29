@@ -12,6 +12,9 @@ This project contains the code for the backend of a personal finance tracker sys
   - **DB**: PostgreSQL
 
 ## Coding Conventions
+- **Package manager**: 
+  - Use `uv` for package management.
+  - Always use `uv add <package>` to add a package. Don't use `pip` or `pipenv`.
 - **Language & Style**  
   - Follow **PEP 8** and **PEP 257** (docstrings in google style).  
   - Use `ruff` for formatting. 
