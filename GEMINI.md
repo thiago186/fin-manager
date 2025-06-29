@@ -15,6 +15,7 @@ This project contains the code for the backend of a personal finance tracker sys
 - **Package manager**: 
   - Use `uv` for package management.
   - Always use `uv add <package>` to add a package. Don't use `pip` or `pipenv`.
+  - Every time that you want to run a command inside the project envirionment, use `uv run <command>`.
 - **Language & Style**  
   - Follow **PEP 8** and **PEP 257** (docstrings in google style).  
   - Use `ruff` for formatting. 
@@ -24,6 +25,8 @@ This project contains the code for the backend of a personal finance tracker sys
   - Classes: `PascalCase`.  
   - Constants: `UPPER_SNAKE_CASE`.  
   - DB tables mirror model names (e.g., `users`, `accounts`).
+- **Running django commands**:
+  - For running django commands, use `uv run python src/manage.py <djangocommand>`, like `uv run python src/manage.py makemigrations`.
 
 ## Testing Requirements
 - Create only simple unit tests.
