@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "pytest_django",
     "apps.users",
+    "apps.accounts",
     "apps.api",
 ]
 
