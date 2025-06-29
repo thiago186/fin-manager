@@ -16,7 +16,35 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "mypy>=1.16.1",
-    "ruff>=0.12.1",
-]
+dev = ["mypy>=1.16.1", "ruff>=0.12.1"]
+
+
+[tool.mypy]
+explicit_package_bases = true
+packages = "src"
+namespace_packages = true
+mypy_path = ["src"]
+allow_redefinition = true
+ignore_missing_imports = true
+exclude = ["gunicorn.conf.py", "manage.py", "/migrations/*"]
+plugins = ["pydantic.mypy", "mypy_django_plugin.main"]
+
+# from https://blog.wolt.com/engineering/2021/09/30/professional-grade-mypy-configuration/
+disallow_untyped_defs = true
+no_implicit_optional = true
+check_untyped_defs = true
+warn_return_any = true
+show_error_codes = true
+warn_unused_ignores = false
+
+disallow_incomplete_defs = true
+disallow_untyped_decorators = false # default
+disallow_any_unimported = false     # handled by Ruff
+
+[tool.django-stubs]
+django_settings_module = "fin_manager.settings"
+strict_settings = true
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "fin_manager.settings"
+python_files = ["test_*.py"]
