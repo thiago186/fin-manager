@@ -7,16 +7,33 @@ from apps.accounts.models.transaction_tag import Tag
 class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
-        fields = ["id", "name", "balance", "account_type"]
+        fields = [
+            "id",
+            "name",
+            "current_balance",
+            "account_type",
+            "currency",
+            "created_at",
+            "updated_at",
+            "is_active",
+        ]
 
 
 class CreditCardSerializer(serializers.ModelSerializer):
     class Meta:
         model = CreditCard
-        fields = ["id", "name", "limit", "due_day", "closing_day"]
+        fields = [
+            "id",
+            "name",
+            "close_date",
+            "due_date",
+            "created_at",
+            "updated_at",
+            "is_active",
+        ]
 
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
-        fields = ["id", "name", "color"]
+        fields = ["id", "name", "created_at"]

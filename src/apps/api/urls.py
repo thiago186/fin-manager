@@ -1,6 +1,5 @@
-from django.urls import path, include
+from django.urls import include, path
 
 urlpatterns = [
-    path("users/", include("apps.users.urls")),
-    path("accounts/", include("apps.accounts.urls")),
+    path("v1/accounts/", include("apps.accounts.urls")),
 ]

@@ -72,7 +72,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "amount",
             "description",
             "occurred_at",
-            "charge_at",
+            "charge_at_card",
             "installments_total",
             "installment_number",
             "installment_group_id",
@@ -102,9 +102,9 @@ class TransactionSerializer(serializers.ModelSerializer):
                 "Please choose either an account or a credit card."
             )
 
-        if credit_card and not attrs.get("charge_at"):
+        if credit_card and not attrs.get("charge_at_card"):
             raise serializers.ValidationError(
-                "When a transaction is associated with a credit card, the 'charge_at' field must be filled."
+                "When a transaction is associated with a credit card, the 'charge_at_card' field must be filled."
             )
 
         installments_total = attrs.get("installments_total", 1)

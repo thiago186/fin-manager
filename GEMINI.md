@@ -35,11 +35,7 @@ This project contains the code for the backend of a personal finance tracker sys
   - Always ensure new API routes are documented using `drf-spectacular` for Swagger UI generation.
 
 ## Testing Requirements
-- Create only simple unit tests.
-- Use `pytest` for testing.
-- Create always functions to test. Don't use class-based tests.
-- Use fixtures and monkeypatching always needed.
-
+- Let's not implement tests for now. You can skip this section.
 ## Commits convention
 - Use conventional commits convention, such as `feat: implemment new feature`
 
