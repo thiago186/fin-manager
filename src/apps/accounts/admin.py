@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from apps.accounts.models import Account, Category, CreditCard
+from apps.accounts.models import Account, Category, CreditCard, Tag
 
 
 @admin.register(Account)
@@ -153,5 +153,42 @@ class CreditCardAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[CreditCard]:
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related("user")
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    """Admin configuration for the Tag model."""
+
+    list_display = [
+        "name",
+        "user",
+        "created_at",
+    ]
+    list_filter = [
+        "created_at",
+    ]
+    search_fields = [
+        "name",
+        "user__username",
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+    ]
+    ordering = [
+        "-created_at",
+    ]
+
+    fieldsets = (
+        ("Basic Information", {"fields": ("user", "name")}),
+        (
+            "Timestamps",
+            {"fields": ("created_at",), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Tag]:
         """Optimize queryset with select_related for better performance."""
         return super().get_queryset(request).select_related("user")
