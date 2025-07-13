@@ -1,4 +1,5 @@
 from typing import Any, cast
+
 from rest_framework import serializers
 
 from apps.accounts.models.categories import Category

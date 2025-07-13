@@ -1,8 +1,9 @@
+from typing import Any
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from apps.accounts.models import Account, Category, CreditCard, Tag
+from apps.accounts.models import Account, Category, CreditCard, Tag, Transaction
 
 
 @admin.register(Account)
@@ -95,7 +96,7 @@ class CategoryAdmin(admin.ModelAdmin):
             "Basic Information",
             {"fields": ("user", "name", "parent", "transaction_type")},
         ),
-        ("Display", {"fields": ("description", "color", "icon")}),
+        ("Display", {"fields": ("description",)}),
         ("Status", {"fields": ("is_active",)}),
         (
             "Timestamps",
@@ -192,3 +193,112 @@ class TagAdmin(admin.ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Tag]:
         """Optimize queryset with select_related for better performance."""
         return super().get_queryset(request).select_related("user")
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    """Admin configuration for the Transaction model."""
+
+    list_display = [
+        "description",
+        "user",
+        "transaction_type",
+        "amount",
+        "account",
+        "credit_card",
+        "occurred_at",
+        "charge_at_card",
+        "category",
+        "installments_total",
+        "installment_number",
+    ]
+    list_filter = [
+        "transaction_type",
+        "occurred_at",
+        "charge_at_card",
+        "category",
+        "subcategory",
+        "installments_total",
+    ]
+    search_fields = [
+        "description",
+        "user__username",
+        "user__email",
+        "account__name",
+        "credit_card__name",
+        "category__name",
+        "subcategory__name",
+    ]
+    readonly_fields = [
+        "installment_group_id",
+    ]
+    list_editable = [
+        "transaction_type",
+        "amount",
+    ]
+    ordering = [
+        "-occurred_at",
+    ]
+    autocomplete_fields = [
+        "account",
+        "credit_card",
+        "category",
+        "subcategory",
+        "tags",
+    ]
+    filter_horizontal = [
+        "tags",
+    ]
+    date_hierarchy = "occurred_at"
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {
+                "fields": (
+                    "user",
+                    "transaction_type",
+                    "amount",
+                    "description",
+                    "occurred_at",
+                )
+            },
+        ),
+        (
+            "Account/Credit Card",
+            {
+                "fields": ("account", "credit_card", "charge_at_card"),
+                "description": "Choose either an account or a credit card, not both.",
+            },
+        ),
+        (
+            "Categorization",
+            {"fields": ("category", "subcategory", "tags")},
+        ),
+        (
+            "Installments",
+            {
+                "fields": (
+                    "installments_total",
+                    "installment_number",
+                    "installment_group_id",
+                ),
+                "description": "For installment transactions, set total and current number.",
+            },
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Transaction]:
+        """Optimize queryset with select_related for better performance."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "user",
+                "account",
+                "credit_card",
+                "category",
+                "subcategory",
+            )
+            .prefetch_related("tags")
+        )
