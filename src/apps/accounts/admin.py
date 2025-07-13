@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from apps.accounts.models import Account, Category
+from apps.accounts.models import Account, Category, CreditCard
 
 
 @admin.register(Account)
@@ -106,3 +106,52 @@ class CategoryAdmin(admin.ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Category]:
         """Optimize queryset with select_related for better performance."""
         return super().get_queryset(request).select_related("user", "parent")
+
+
+@admin.register(CreditCard)
+class CreditCardAdmin(admin.ModelAdmin):
+    """Admin configuration for the CreditCard model."""
+
+    list_display = [
+        "name",
+        "user",
+        "close_date",
+        "due_date",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = [
+        "is_active",
+        "created_at",
+        "close_date",
+        "due_date",
+    ]
+    search_fields = [
+        "name",
+        "user__username",
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    list_editable = [
+        "is_active",
+    ]
+    ordering = [
+        "-created_at",
+    ]
+
+    fieldsets = (
+        ("Basic Information", {"fields": ("user", "name")}),
+        ("Billing Cycle", {"fields": ("close_date", "due_date")}),
+        ("Status", {"fields": ("is_active",)}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CreditCard]:
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related("user")
