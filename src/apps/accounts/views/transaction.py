@@ -5,11 +5,12 @@ Provides endpoints for creating, reading, updating, and deleting transactions.
 Transactions are filtered by the authenticated user and can be filtered by transaction type, account, credit card, category, and date.
 """
 
-from typing import Any, Type
+from typing import Any
 
+from django.db import models
 from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
-from rest_framework import serializers, status
+from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -88,6 +89,12 @@ class TransactionViewSet(ModelViewSet):
                 location=OpenApiParameter.QUERY,
                 description="Filter by occurred_at date (YYYY-MM-DD)",
             ),
+            OpenApiParameter(
+                name="inactive_categories",
+                type=bool,
+                location=OpenApiParameter.QUERY,
+                description="Include inactive categories in the response",
+            ),
         ],
         responses={200: TransactionSerializer(many=True)},
     )
@@ -124,6 +131,15 @@ class TransactionViewSet(ModelViewSet):
         occurred_at = request.query_params.get("occurred_at")
         if occurred_at:
             queryset = queryset.filter(occurred_at=occurred_at)
+
+        inactive_categories = request.query_params.get("inactive_categories")
+        if not inactive_categories:
+            queryset = queryset.filter(
+                models.Q(category__isnull=True) | models.Q(category__is_active=True)
+            ).filter(
+                models.Q(subcategory__isnull=True)
+                | models.Q(subcategory__is_active=True)
+            )
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
