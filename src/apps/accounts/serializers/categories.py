@@ -3,6 +3,8 @@ from typing import Any, cast
 from rest_framework import serializers
 
 from apps.accounts.models.categories import Category
+from apps.accounts.models.subcategory import Subcategory
+from apps.accounts.serializers.subcategory import SubcategoryListSerializer
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -15,26 +17,21 @@ class CategorySerializer(serializers.ModelSerializer):
 class CategoryListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ["id", "name", "transaction_type", "parent", "is_active"]
+        fields = ["id", "name", "transaction_type", "is_active"]
 
 
 class CategoryDetailSerializer(serializers.ModelSerializer):
     subcategories = serializers.SerializerMethodField()
-    parent_category = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
         fields = "__all__"
 
     def get_subcategories(self, obj: Category) -> list[dict[str, Any]]:
+        """Get subcategories for this category."""
+
+        subcategories = Subcategory.objects.filter(category=obj, is_active=True)
         return cast(
             list[dict[str, Any]],
-            CategoryListSerializer(
-                obj.subcategories.filter(is_active=True), many=True
-            ).data,
+            SubcategoryListSerializer(subcategories, many=True).data,
         )
-
-    def get_parent_category(self, obj: Category) -> dict | None:
-        if obj.parent:
-            return CategoryListSerializer(obj.parent).data
-        return None

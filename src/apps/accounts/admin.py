@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from apps.accounts.models import Account, Category, CreditCard, Tag, Transaction
+from apps.accounts.models import Account, Category, CreditCard, Subcategory, Tag, Transaction
 
 
 @admin.register(Account)
@@ -58,9 +58,7 @@ class CategoryAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "user",
-        "parent",
         "transaction_type",
-        "level",
         "is_active",
         "created_at",
     ]
@@ -68,7 +66,6 @@ class CategoryAdmin(admin.ModelAdmin):
         "transaction_type",
         "is_active",
         "created_at",
-        "parent",
     ]
     search_fields = [
         "name",
@@ -79,7 +76,60 @@ class CategoryAdmin(admin.ModelAdmin):
     readonly_fields = [
         "created_at",
         "updated_at",
-        "level",
+    ]
+    list_editable = [
+        "is_active",
+    ]
+    ordering = [
+        "name",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("user", "name", "transaction_type")},
+        ),
+        ("Display", {"fields": ("description",)}),
+        ("Status", {"fields": ("is_active",)}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Category]:
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related("user")
+
+
+@admin.register(Subcategory)
+class SubcategoryAdmin(admin.ModelAdmin):
+    """Admin configuration for the Subcategory model."""
+
+    list_display = [
+        "name",
+        "user",
+        "category",
+        "transaction_type",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = [
+        "category",
+        "is_active",
+        "created_at",
+    ]
+    search_fields = [
+        "name",
+        "description",
+        "user__username",
+        "user__email",
+        "category__name",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+        "transaction_type",
     ]
     list_editable = [
         "is_active",
@@ -88,25 +138,31 @@ class CategoryAdmin(admin.ModelAdmin):
         "name",
     ]
     autocomplete_fields = [
-        "parent",
+        "category",
     ]
 
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("user", "name", "parent", "transaction_type")},
+            {"fields": ("user", "name", "category")},
         ),
         ("Display", {"fields": ("description",)}),
         ("Status", {"fields": ("is_active",)}),
         (
             "Timestamps",
-            {"fields": ("created_at", "updated_at", "level"), "classes": ("collapse",)},
+            {"fields": ("created_at", "updated_at", "transaction_type"), "classes": ("collapse",)},
         ),
     )
 
-    def get_queryset(self, request: HttpRequest) -> QuerySet[Category]:
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Subcategory]:
         """Optimize queryset with select_related for better performance."""
-        return super().get_queryset(request).select_related("user", "parent")
+        return super().get_queryset(request).select_related("user", "category")
+
+    def transaction_type(self, obj: Subcategory) -> str:
+        """Get transaction type from parent category."""
+        return obj.category.transaction_type
+
+    transaction_type.short_description = "Transaction Type"
 
 
 @admin.register(CreditCard)

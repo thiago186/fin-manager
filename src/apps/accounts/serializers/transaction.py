@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.accounts.models.account import Account
 from apps.accounts.models.categories import Category
+from apps.accounts.models.subcategory import Subcategory
 from apps.accounts.models.credit_card import CreditCard
 from apps.accounts.models.transaction import Transaction
 from apps.accounts.models.transaction_tag import Tag
@@ -11,6 +12,7 @@ from apps.accounts.serializers import (
     AccountSerializer,
     CategoryListSerializer,
     CreditCardSerializer,
+    SubcategoryListSerializer,
     TagSerializer,
 )
 
@@ -45,9 +47,9 @@ class TransactionSerializer(serializers.ModelSerializer):
         write_only=True,
     )
 
-    subcategory = CategoryListSerializer(read_only=True)
+    subcategory = SubcategoryListSerializer(read_only=True)
     subcategory_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.filter(is_active=True),
+        queryset=Subcategory.objects.filter(is_active=True),
         source="subcategory",
         required=False,
         allow_null=True,
@@ -131,7 +133,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         subcategory = attrs.get("subcategory")
 
         if category and subcategory:
-            if subcategory.parent != category:
+            if subcategory.category != category:
                 raise serializers.ValidationError(
                     "Subcategory must belong to the selected category."
                 )

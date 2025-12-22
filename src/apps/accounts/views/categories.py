@@ -10,10 +10,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models.categories import Category
+from apps.accounts.models.subcategory import Subcategory
 from apps.accounts.serializers import (
     CategoryDetailSerializer,
     CategoryListSerializer,
     CategorySerializer,
+    SubcategoryListSerializer,
 )
 
 
@@ -74,16 +76,6 @@ class CategoryViewSet(ModelViewSet):
                     OpenApiExample("Expense", value="expense"),
                 ],
             ),
-            OpenApiParameter(
-                name="parent",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Filter by parent category ID (null for top-level)",
-                examples=[
-                    OpenApiExample("Top-level", value="null"),
-                    OpenApiExample("With parent", value="1"),
-                ],
-            ),
         ],
         responses={200: CategoryListSerializer(many=True)},
     )
@@ -104,16 +96,6 @@ class CategoryViewSet(ModelViewSet):
         transaction_type = request.query_params.get("transaction_type")
         if transaction_type:
             queryset = queryset.filter(transaction_type=transaction_type)
-
-        parent_param = request.query_params.get("parent")
-        if parent_param == "null":
-            queryset = queryset.filter(parent__isnull=True)
-        elif parent_param:
-            try:
-                parent_id = int(parent_param)
-                queryset = queryset.filter(parent_id=parent_id)
-            except ValueError:
-                pass
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -226,27 +208,6 @@ class CategoryViewSet(ModelViewSet):
 
     @extend_schema(
         tags=["categories"],
-        summary="List top-level categories",
-        description="Retrieve only top-level categories (no parent)",
-        responses={200: CategoryListSerializer(many=True)},
-    )
-    @action(detail=False, methods=["get"])
-    def top_level(self, request: Request) -> Response:
-        """
-        Get only top-level categories.
-
-        Args:
-            request: The HTTP request
-
-        Returns:
-            Response with list of top-level categories
-        """
-        queryset = self.get_queryset().filter(parent__isnull=True)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-    @extend_schema(
-        tags=["categories"],
         summary="List subcategories",
         description="Retrieve subcategories of a specific category",
         parameters=[
@@ -257,7 +218,7 @@ class CategoryViewSet(ModelViewSet):
                 description="ID of the parent category",
             ),
         ],
-        responses={200: CategoryListSerializer(many=True)},
+        responses={200: SubcategoryListSerializer(many=True)},
     )
     @action(detail=True, methods=["get"])
     def subcategories(self, request: Request, pk: int | None = None) -> Response:
@@ -272,6 +233,8 @@ class CategoryViewSet(ModelViewSet):
             Response with list of subcategories
         """
         category = self.get_object()
-        subcategories = category.subcategories.filter(is_active=True)
-        serializer = CategoryListSerializer(subcategories, many=True)
+        subcategories = Subcategory.objects.filter(
+            category=category, user=request.user, is_active=True
+        )
+        serializer = SubcategoryListSerializer(subcategories, many=True)
         return Response(serializer.data)
