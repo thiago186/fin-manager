@@ -8,6 +8,7 @@ from django.db import transaction as db_transaction
 
 from apps.accounts.models.account import Account
 from apps.accounts.models.categories import Category
+from apps.accounts.models.subcategory import Subcategory
 from apps.accounts.models.credit_card import CreditCard
 from apps.accounts.models.transaction import Transaction
 from apps.accounts.models.transaction_tag import Tag
@@ -105,12 +106,10 @@ class CSVImportService:
                     category = self._match_category_by_name(
                         transaction._csv_category_name,  # type: ignore
                         transaction.transaction_type,
-                        None,
                     )
                     if category:
                         transaction.category = category
 
-                # Match subcategory if name provided
                 if (
                     hasattr(transaction, "_csv_subcategory_name")
                     and transaction._csv_subcategory_name
@@ -121,9 +120,8 @@ class CSVImportService:
                             f"Transaction {idx}: Cannot set subcategory without category"
                         )
                     else:
-                        subcategory = self._match_category_by_name(
+                        subcategory = self._match_subcategory_by_name(
                             transaction._csv_subcategory_name,  # type: ignore
-                            transaction.transaction_type,
                             parent_category,
                         )
                         if subcategory:
@@ -178,31 +176,23 @@ class CSVImportService:
             }
 
     def _match_category_by_name(
-        self, name: str, transaction_type: str, parent: Category | None
-    ) -> Category:
+        self, name: str, transaction_type: Category.TransactionType
+    ) -> Category | None:
         """Match or create category by name.
 
         Args:
             name: Category name.
             transaction_type: Transaction type (INCOME/EXPENSE).
-            parent: Parent category if this is a subcategory.
 
         Returns:
-            Category instance (existing or newly created).
+            Category instance (existing or newly created), or None if not found.
         """
-        # Normalize transaction type for category
-        category_transaction_type = (
-            "income"
-            if transaction_type == Transaction.TransactionType.INCOME
-            else "expense"
-        )
 
         # Try to find existing category
         category = Category.objects.filter(
             user=self.user,
             name__iexact=name,
-            parent=parent,
-            transaction_type=category_transaction_type,
+            transaction_type=transaction_type,
         ).first()
 
         if category:
@@ -212,11 +202,39 @@ class CSVImportService:
         category = Category.objects.create(
             user=self.user,
             name=name,
-            parent=parent,
-            transaction_type=category_transaction_type,
+            transaction_type=transaction_type,
         )
 
         return category
+
+    def _match_subcategory_by_name(
+        self, name: str, category: Category
+    ) -> Subcategory | None:
+        """Match or create subcategory by name.
+
+        Args:
+            name: Subcategory name.
+            category: Parent category.
+
+        Returns:
+            Subcategory instance (existing or newly created), or None if not found.
+        """
+        subcategory = Subcategory.objects.filter(
+            user=self.user,
+            name__iexact=name,
+            category=category,
+        ).first()
+
+        if subcategory:
+            return subcategory
+
+        subcategory = Subcategory.objects.create(
+            user=self.user,
+            name=name,
+            category=category,
+        )
+
+        return subcategory
 
     def _match_account(self, identifier: str) -> Account | None:
         """Match account by name or ID.
