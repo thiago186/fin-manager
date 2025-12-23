@@ -185,16 +185,12 @@ class CreditCardAdmin(admin.ModelAdmin):
     list_display = [
         "name",
         "user",
-        "close_date",
-        "due_date",
         "is_active",
         "created_at",
     ]
     list_filter = [
         "is_active",
         "created_at",
-        "close_date",
-        "due_date",
     ]
     search_fields = [
         "name",
@@ -214,7 +210,6 @@ class CreditCardAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ("Basic Information", {"fields": ("user", "name")}),
-        ("Billing Cycle", {"fields": ("close_date", "due_date")}),
         ("Status", {"fields": ("is_active",)}),
         (
             "Timestamps",
@@ -276,7 +271,6 @@ class TransactionAdmin(admin.ModelAdmin):
         "account",
         "credit_card",
         "occurred_at",
-        "charge_at_card",
         "category",
         "installments_total",
         "installment_number",
@@ -284,7 +278,6 @@ class TransactionAdmin(admin.ModelAdmin):
     list_filter = [
         "transaction_type",
         "occurred_at",
-        "charge_at_card",
         "category",
         "subcategory",
         "installments_total",
@@ -336,7 +329,7 @@ class TransactionAdmin(admin.ModelAdmin):
         (
             "Account/Credit Card",
             {
-                "fields": ("account", "credit_card", "charge_at_card"),
+                "fields": ("account", "credit_card"),
                 "description": "Choose either an account or a credit card, not both.",
             },
         ),

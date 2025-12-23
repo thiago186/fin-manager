@@ -52,7 +52,6 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     description = models.CharField(max_length=255, blank=True, null=True)
     occurred_at = models.DateField()
-    charge_at_card = models.DateField(null=True, blank=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -96,11 +95,6 @@ class Transaction(models.Model):
             raise ValidationError(
                 "A transaction cannot be associated with both an account and a credit card. "
                 "Please choose either an account or a credit card."
-            )
-
-        if self.credit_card and not self.charge_at_card:
-            raise ValidationError(
-                "When a transaction is associated with a credit card, the 'charge_at_card' field must be filled."
             )
 
         if self.installments_total > 1 or self.installment_number > 1:

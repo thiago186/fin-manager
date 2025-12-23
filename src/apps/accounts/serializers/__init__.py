@@ -10,7 +10,10 @@ from .subcategory import (
     SubcategoryListSerializer,
     SubcategorySerializer,
 )
-from .transaction import TransactionSerializer
+from .transaction import (
+    BulkTransactionUpdateRequestSerializer,
+    TransactionSerializer,
+)
 
 __all__ = [
     "AccountSerializer",
@@ -23,5 +26,6 @@ __all__ = [
     "SubcategoryListSerializer",
     "SubcategoryDetailSerializer",
     "TransactionSerializer",
+    "BulkTransactionUpdateRequestSerializer",
     "ImportedReportSerializer",
 ]

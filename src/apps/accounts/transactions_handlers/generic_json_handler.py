@@ -107,7 +107,6 @@ class JSONCreditCardHandler(BaseCreditCardBillHandler):
             amount=amount,
             description=item["name"],
             occurred_at=transaction_date,
-            charge_at_card=transaction_date,
             installments_total=total_installments,
             installment_number=current_installment,
         )

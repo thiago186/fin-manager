@@ -24,7 +24,6 @@ class DefaultCSVHandler(BaseCSVHandler):
     TAGS_COLUMNS = ["tags", "tag"]
     INSTALLMENTS_TOTAL_COLUMNS = ["installments_total", "total_installments"]
     INSTALLMENT_NUMBER_COLUMNS = ["installment_number", "current_installment"]
-    CHARGE_DATE_COLUMNS = ["charge_at_card", "charge_date"]
 
     # Date formats to try
     DATE_FORMATS = [
@@ -166,9 +165,6 @@ class DefaultCSVHandler(BaseCSVHandler):
         installment_number_value = self._find_column_value(
             normalized_row, self.INSTALLMENT_NUMBER_COLUMNS
         )
-        charge_date_value = self._find_column_value(
-            normalized_row, self.CHARGE_DATE_COLUMNS
-        )
 
         # Parse installments
         installments_total = 1
@@ -189,11 +185,6 @@ class DefaultCSVHandler(BaseCSVHandler):
             except (ValueError, TypeError):
                 pass
 
-        # Parse charge date
-        charge_at_card = None
-        if charge_date_value:
-            charge_at_card = self._parse_date(charge_date_value, row_num)
-
         # Create transaction object (without saving)
         transaction = Transaction(
             user=user,
@@ -201,7 +192,6 @@ class DefaultCSVHandler(BaseCSVHandler):
             amount=amount,
             description=description,
             occurred_at=occurred_at,
-            charge_at_card=charge_at_card,
             installments_total=installments_total,
             installment_number=installment_number,
         )

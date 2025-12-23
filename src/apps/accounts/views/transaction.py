@@ -7,10 +7,12 @@ Transactions are filtered by the authenticated user and can be filtered by trans
 
 from typing import Any
 
-from django.db import models
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import models, transaction as db_transaction
 from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
-from rest_framework import serializers
+from rest_framework import serializers, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -18,6 +20,10 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models.transaction import Transaction
 from apps.accounts.serializers import TransactionSerializer
+from apps.accounts.serializers.transaction import (
+    BulkTransactionUpdateRequestSerializer,
+    BulkTransactionUpdateSerializer,
+)
 
 
 class TransactionViewSet(ModelViewSet):
@@ -246,3 +252,156 @@ class TransactionViewSet(ModelViewSet):
             Empty response with 204 status
         """
         return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=["transactions"],
+        summary="Bulk update transactions",
+        description=(
+            "Update multiple transactions in a single request. "
+            "Each transaction update must include the transaction ID and the fields to update. "
+            "All transactions must belong to the authenticated user. "
+            "The operation is atomic - if any transaction fails validation, none are updated."
+        ),
+        request=BulkTransactionUpdateRequestSerializer,
+        responses={
+            200: TransactionSerializer(many=True),
+            400: {"description": "Validation errors"},
+        },
+        examples=[
+            OpenApiExample(
+                "Bulk Update Request",
+                value={
+                    "transactions": [
+                        {
+                            "id": 1,
+                            "category_id": 5,
+                            "description": "Updated description",
+                        },
+                        {
+                            "id": 2,
+                            "amount": "150.00",
+                            "subcategory_id": 10,
+                        },
+                    ]
+                },
+                request_only=True,
+            ),
+        ],
+    )
+    @action(detail=False, methods=["patch"], url_path="bulk-update")
+    def bulk_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Bulk update multiple transactions.
+
+        Args:
+            request: The HTTP request containing a list of transaction updates
+            *args: Additional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Response with updated transactions or validation errors
+        """
+        request_serializer = BulkTransactionUpdateRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(
+                request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        transaction_updates = request_serializer.validated_data["transactions"]
+        transaction_ids = [update["id"] for update in transaction_updates]
+
+        user_transactions = Transaction.objects.filter(
+            id__in=transaction_ids, user=request.user
+        )
+
+        if user_transactions.count() != len(transaction_ids):
+            found_ids = set(user_transactions.values_list("id", flat=True))
+            missing_ids = set(transaction_ids) - found_ids
+            return Response(
+                {
+                    "error": "Some transactions were not found or do not belong to the authenticated user",
+                    "missing_transaction_ids": list(missing_ids),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        transaction_map = {t.id: t for t in user_transactions}
+        updated_transactions = []
+        errors = []
+
+        try:
+            with db_transaction.atomic():
+                for update_data in transaction_updates:
+                    transaction_id = update_data.get("id")
+                    if transaction_id is None:
+                        errors.append(
+                            {
+                                "transaction_id": None,
+                                "errors": {"id": ["This field is required."]},
+                            }
+                        )
+                        continue
+
+                    transaction = transaction_map.get(transaction_id)
+                    if transaction is None:
+                        errors.append(
+                            {
+                                "transaction_id": transaction_id,
+                                "errors": {
+                                    "id": [
+                                        f"Transaction with id {transaction_id} not found or does not belong to user."
+                                    ]
+                                },
+                            }
+                        )
+                        continue
+
+                    update_serializer = BulkTransactionUpdateSerializer(
+                        data=update_data, context={"request": request}
+                    )
+                    if not update_serializer.is_valid():
+                        errors.append(
+                            {
+                                "transaction_id": transaction_id,
+                                "errors": update_serializer.errors,
+                            }
+                        )
+                        continue
+
+                    try:
+                        updated_transaction = update_serializer.update_transaction(
+                            transaction
+                        )
+                        updated_transactions.append(updated_transaction)
+                    except DjangoValidationError as e:
+                        errors.append(
+                            {
+                                "transaction_id": transaction_id,
+                                "errors": {
+                                    "non_field_errors": e.messages
+                                    if hasattr(e, "messages")
+                                    else [str(e)]
+                                },
+                            }
+                        )
+                    except Exception as e:
+                        errors.append(
+                            {
+                                "transaction_id": transaction_id,
+                                "errors": {"non_field_errors": [str(e)]},
+                            }
+                        )
+
+                if errors:
+                    raise serializers.ValidationError({"transaction_errors": errors})
+
+        except serializers.ValidationError as e:
+            return Response({"errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to update transactions: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        response_serializer = TransactionSerializer(updated_transactions, many=True)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

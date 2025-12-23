@@ -253,8 +253,6 @@ class CreditCardListPagination(PageNumberPagination):
                             {
                                 "id": 1,
                                 "name": "Nubank Credit Card",
-                                "close_date": 15,
-                                "due_date": 20,
                                 "created_at": "2024-01-01T00:00:00Z",
                                 "updated_at": "2024-01-01T00:00:00Z",
                                 "is_active": True,
@@ -262,8 +260,6 @@ class CreditCardListPagination(PageNumberPagination):
                             {
                                 "id": 2,
                                 "name": "Itau Credit Card",
-                                "close_date": 10,
-                                "due_date": 15,
                                 "created_at": "2024-01-02T00:00:00Z",
                                 "updated_at": "2024-01-02T00:00:00Z",
                                 "is_active": True,

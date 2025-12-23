@@ -17,7 +17,7 @@ class CreditCardViewSet(ModelViewSet):
     ViewSet for managing credit cards with CRUD operations.
 
     Provides endpoints for creating, reading, updating, and deleting credit cards.
-    Credit cards are filtered by the authenticated user and can be filtered by is_active, close_date, and due_date.
+    Credit cards are filtered by the authenticated user and can be filtered by is_active.
     """
 
     permission_classes = [IsAuthenticated]
@@ -56,26 +56,6 @@ class CreditCardViewSet(ModelViewSet):
                     OpenApiExample("Inactive", value=False),
                 ],
             ),
-            OpenApiParameter(
-                name="close_date",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Filter by close date (1-31)",
-                examples=[
-                    OpenApiExample("Close on 15th", value=15),
-                    OpenApiExample("Close on 30th", value=30),
-                ],
-            ),
-            OpenApiParameter(
-                name="due_date",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Filter by due date (1-31)",
-                examples=[
-                    OpenApiExample("Due on 20th", value=20),
-                    OpenApiExample("Due on 25th", value=25),
-                ],
-            ),
         ],
         responses={200: CreditCardSerializer(many=True)},
     )
@@ -99,24 +79,6 @@ class CreditCardViewSet(ModelViewSet):
                 queryset = queryset.filter(is_active=True)
             elif is_active.lower() == "false":
                 queryset = queryset.filter(is_active=False)
-
-        close_date = request.query_params.get("close_date")
-        if close_date:
-            try:
-                close_date_int = int(close_date)
-                if 1 <= close_date_int <= 31:
-                    queryset = queryset.filter(close_date=close_date_int)
-            except ValueError:
-                pass
-
-        due_date = request.query_params.get("due_date")
-        if due_date:
-            try:
-                due_date_int = int(due_date)
-                if 1 <= due_date_int <= 31:
-                    queryset = queryset.filter(due_date=due_date_int)
-            except ValueError:
-                pass
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)

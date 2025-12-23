@@ -25,8 +25,6 @@ class CreditCardSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
-            "close_date",
-            "due_date",
             "created_at",
             "updated_at",
             "is_active",
