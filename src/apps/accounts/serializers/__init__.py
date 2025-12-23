@@ -4,6 +4,7 @@ from .categories import (
     CategorySerializer,
 )
 from .general import AccountSerializer, CreditCardSerializer, TagSerializer
+from .imported_report import ImportedReportSerializer
 from .subcategory import (
     SubcategoryDetailSerializer,
     SubcategoryListSerializer,
@@ -22,4 +23,5 @@ __all__ = [
     "SubcategoryListSerializer",
     "SubcategoryDetailSerializer",
     "TransactionSerializer",
+    "ImportedReportSerializer",
 ]

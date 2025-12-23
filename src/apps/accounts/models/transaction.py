@@ -61,7 +61,7 @@ class Transaction(models.Model):
         related_name="transactions",
     )
     subcategory = models.ForeignKey(
-        Category,
+        Subcategory,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -84,6 +84,9 @@ class Transaction(models.Model):
     updated_at = models.DateTimeField(
         auto_now=True, help_text="The date and time the transaction was last updated"
     )
+
+    # Type hints
+    id: int
 
     def clean(self) -> None:
         """Validate the transaction data."""

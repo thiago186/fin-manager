@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 import sys
 import structlog
 
@@ -250,3 +251,19 @@ LOGGING = {
         },
     },
 }
+
+# CSV File Storage Configuration
+CSV_STORAGE_BACKEND = os.environ.get("CSV_STORAGE_BACKEND", "local")
+CSV_STORAGE_LOCAL_DIR = os.environ.get("CSV_STORAGE_LOCAL_DIR", "files")
+CSV_STORAGE_S3_BUCKET = os.environ.get("CSV_STORAGE_S3_BUCKET", "")
+CSV_STORAGE_S3_REGION = os.environ.get("CSV_STORAGE_S3_REGION", "")
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND", "redis://localhost:6379/0"
+)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE

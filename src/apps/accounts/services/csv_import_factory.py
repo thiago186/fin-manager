@@ -4,8 +4,8 @@ from typing import Type
 import pandas as pd
 
 from apps.accounts.interfaces.csv_handler import BaseCSVHandler
-from apps.accounts.transactions_handlers.banco_inter_csv_handler import (
-    BancoInterCsvHandler,
+from apps.accounts.transactions_handlers.banco_inter_credit_card_csv_handler import (
+    BancoInterCreditCardCsvHandler,
 )
 from apps.accounts.transactions_handlers.default_csv_handler import DefaultCSVHandler
 
@@ -17,7 +17,7 @@ class CSVImportFactory:
 
     # Registry of format handlers (order matters - more specific handlers first)
     _handlers: list[Type[BaseCSVHandler]] = [
-        BancoInterCsvHandler,
+        BancoInterCreditCardCsvHandler,
         DefaultCSVHandler,
     ]
 
@@ -72,7 +72,7 @@ class CSVImportFactory:
                 encoding="utf-8-sig",
                 nrows=0,  # Only read headers, not data
             )
-            if df.empty or df.columns.empty:
+            if df.columns.empty:
                 raise ValueError("CSV file is empty or has no headers")
             # Normalize headers: strip whitespace and convert to lowercase
             return [str(col).strip().lower() for col in df.columns]

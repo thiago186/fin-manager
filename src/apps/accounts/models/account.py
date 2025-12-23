@@ -2,6 +2,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from django.db import models
 
+
 class Account(models.Model):
     """
     Represents a user's bank account where money can be deposited or withdrawn immediately.
@@ -19,6 +20,8 @@ class Account(models.Model):
         """Currency choices."""
 
         BRL = "BRL", "Brazilian Real"
+
+    id: int
 
     user = models.ForeignKey(
         User,

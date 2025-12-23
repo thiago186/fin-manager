@@ -1,9 +1,19 @@
 from typing import Any
+
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from apps.accounts.models import Account, Category, CreditCard, Subcategory, Tag, Transaction
+from apps.accounts.models import (
+    Account,
+    Category,
+    CreditCard,
+    ImportedReport,
+    Subcategory,
+    Tag,
+    Transaction,
+)
+from apps.accounts.tasks import process_csv_import_task
 
 
 @admin.register(Account)
@@ -150,7 +160,10 @@ class SubcategoryAdmin(admin.ModelAdmin):
         ("Status", {"fields": ("is_active",)}),
         (
             "Timestamps",
-            {"fields": ("created_at", "updated_at", "transaction_type"), "classes": ("collapse",)},
+            {
+                "fields": ("created_at", "updated_at", "transaction_type"),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -357,4 +370,112 @@ class TransactionAdmin(admin.ModelAdmin):
                 "subcategory",
             )
             .prefetch_related("tags")
+        )
+
+
+@admin.register(ImportedReport)
+class ImportedReportAdmin(admin.ModelAdmin):
+    """Admin configuration for the ImportedReport model."""
+
+    list_display = [
+        "file_name",
+        "user",
+        "status",
+        "handler_type",
+        "success_count",
+        "error_count",
+        "created_at",
+        "processed_at",
+    ]
+    list_filter = [
+        "status",
+        "handler_type",
+        "created_at",
+        "processed_at",
+    ]
+    search_fields = [
+        "file_name",
+        "file_path",
+        "user__username",
+        "user__email",
+        "handler_type",
+        "failed_reason",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+        "processed_at",
+        "errors",
+    ]
+    ordering = [
+        "-created_at",
+    ]
+    date_hierarchy = "created_at"
+    actions = [
+        "rerun_import",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("user", "file_name", "file_path", "status")},
+        ),
+        (
+            "Processing Details",
+            {
+                "fields": (
+                    "handler_type",
+                    "success_count",
+                    "error_count",
+                    "errors",
+                )
+            },
+        ),
+        (
+            "Failure Information",
+            {"fields": ("failed_reason",), "classes": ("collapse",)},
+        ),
+        (
+            "Timestamps",
+            {
+                "fields": ("created_at", "updated_at", "processed_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ImportedReport]:
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related("user")
+
+    @admin.action(description="Re-run import for selected reports")
+    def rerun_import(
+        self, request: HttpRequest, queryset: QuerySet[ImportedReport]
+    ) -> None:
+        """Admin action to re-run CSV import for selected reports.
+
+        This action schedules Celery tasks to process the selected ImportedReport
+        instances asynchronously. The status will be updated to PROCESSING when
+        the task starts.
+
+        Args:
+            request: HTTP request object.
+            queryset: QuerySet of ImportedReport instances to re-run.
+        """
+        count = 0
+        for imported_report in queryset:
+            # Reset status to SENT so it can be processed again
+            imported_report.status = ImportedReport.Status.SENT
+            imported_report.failed_reason = None
+            imported_report.save(
+                update_fields=["status", "failed_reason", "updated_at"]
+            )
+
+            # Schedule the Celery task
+            process_csv_import_task.delay(imported_report.id)
+            count += 1
+
+        self.message_user(
+            request,
+            f"Successfully scheduled {count} import{'s' if count != 1 else ''} for re-processing.",
         )

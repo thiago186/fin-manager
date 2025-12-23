@@ -13,6 +13,8 @@ class CreditCard(models.Model):
     for financial planning and payment reminders.
     """
 
+    id: int
+
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,

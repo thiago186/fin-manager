@@ -9,7 +9,7 @@ from apps.accounts.interfaces.csv_handler import BaseCSVHandler
 from apps.accounts.models.transaction import Transaction
 
 
-class BancoInterCsvHandler(BaseCSVHandler):
+class BancoInterCreditCardCsvHandler(BaseCSVHandler):
     """Handler for parsing transactions from Banco Inter credit card CSV files."""
 
     # Expected headers for Banco Inter CSV format

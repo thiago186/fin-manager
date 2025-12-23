@@ -24,6 +24,9 @@ class Tag(models.Model):
         help_text="The date and time when the tag was created",
     )
 
+    # Type hints
+    id: int
+
     class Meta:
         """Meta options for the Tag model."""
 
