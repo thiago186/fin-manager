@@ -2,11 +2,24 @@ from typing import Any
 
 from rest_framework import serializers
 
+from apps.accounts.models.account import Account
+from apps.accounts.models.credit_card import CreditCard
+
 
 class CSVImportSerializer(serializers.Serializer):
     """Serializer for CSV file upload validation."""
 
     file = serializers.FileField(help_text="CSV file containing transactions to import")
+    account_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="ID of the bank account to associate with all imported transactions",
+    )
+    credit_card_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="ID of the credit card to associate with all imported transactions",
+    )
 
     def validate_file(self, value: Any) -> Any:
         """Validate that the uploaded file is a CSV file.
@@ -38,6 +51,77 @@ class CSVImportSerializer(serializers.Serializer):
                 )
 
         return value
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        """Validate that account_id and credit_card_id are not both provided.
+
+        Args:
+            attrs: Dictionary of validated attributes.
+
+        Returns:
+            Validated attributes.
+
+        Raises:
+            serializers.ValidationError: If both account_id and credit_card_id are provided.
+        """
+        account_id = attrs.get("account_id")
+        credit_card_id = attrs.get("credit_card_id")
+
+        if account_id is not None and credit_card_id is not None:
+            raise serializers.ValidationError(
+                "Cannot specify both account_id and credit_card_id. "
+                "A transaction can only be associated with either an account or a credit card."
+            )
+
+        return attrs
+
+    def validate_account_id(self, value: int | None) -> int | None:
+        """Validate that the account exists and belongs to the user.
+
+        Args:
+            value: Account ID.
+
+        Returns:
+            Validated account ID.
+
+        Raises:
+            serializers.ValidationError: If account does not exist or does not belong to user.
+        """
+        if value is None:
+            return value
+
+        user = self.context.get("request").user  # type: ignore
+        try:
+            account = Account.objects.get(id=value, user=user)
+            return account.id
+        except Account.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Account with ID {value} does not exist or does not belong to you."
+            )
+
+    def validate_credit_card_id(self, value: int | None) -> int | None:
+        """Validate that the credit card exists and belongs to the user.
+
+        Args:
+            value: Credit card ID.
+
+        Returns:
+            Validated credit card ID.
+
+        Raises:
+            serializers.ValidationError: If credit card does not exist or does not belong to user.
+        """
+        if value is None:
+            return value
+
+        user = self.context.get("request").user  # type: ignore
+        try:
+            credit_card = CreditCard.objects.get(id=value, user=user)
+            return credit_card.id
+        except CreditCard.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Credit card with ID {value} does not exist or does not belong to you."
+            )
 
 
 class CSVImportResultSerializer(serializers.Serializer):

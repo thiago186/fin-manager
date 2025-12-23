@@ -110,8 +110,6 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
 
         description = row.get("lançamento", "").strip() or ""
 
-        category_name = row.get("categoria", "").strip()
-
         transaction = Transaction(
             user=user,
             transaction_type=transaction_type,
@@ -119,9 +117,6 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
             description=description,
             occurred_at=occurred_at,
         )
-
-        if category_name:
-            transaction._csv_category_name = category_name  # type: ignore
 
         return transaction
 

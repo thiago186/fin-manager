@@ -1,3 +1,4 @@
+import os
 import structlog
 from typing import Type
 
@@ -65,6 +66,14 @@ class CSVImportFactory:
             ValueError: If file cannot be read or is not a valid CSV.
         """
         try:
+            logger.debug(
+                "Reading CSV file",
+                path=csv_file_path,
+                exists=os.path.exists(csv_file_path),
+                size=os.path.getsize(csv_file_path)
+                if os.path.exists(csv_file_path)
+                else 0,
+            )
             # Read only the first row to get headers
             # utf-8-sig automatically handles BOM
             df = pd.read_csv(

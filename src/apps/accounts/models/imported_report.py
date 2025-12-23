@@ -3,6 +3,9 @@ from typing import Any
 from django.contrib.auth.models import User
 from django.db import models
 
+from apps.accounts.models.account import Account
+from apps.accounts.models.credit_card import CreditCard
+
 
 class ImportedReport(models.Model):
     """Represents a CSV import report with status tracking."""
@@ -22,6 +25,22 @@ class ImportedReport(models.Model):
         on_delete=models.CASCADE,
         related_name="imported_reports",
         help_text="The user who uploaded this import",
+    )
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="imported_reports",
+        help_text="Bank account to associate with all imported transactions",
+    )
+    credit_card = models.ForeignKey(
+        CreditCard,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="imported_reports",
+        help_text="Credit card to associate with all imported transactions",
     )
     status = models.CharField(
         max_length=20,

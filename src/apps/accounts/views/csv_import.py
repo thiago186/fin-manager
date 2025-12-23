@@ -28,6 +28,7 @@ class CSVImportView(APIView):
             "Categories and subcategories are matched by name and created if they don't exist. "
             "Accounts and credit cards are matched by name or ID (must exist). "
             "Tags are matched by name and created if they don't exist. "
+            "Optionally specify account_id or credit_card_id to associate all imported transactions with a specific account or credit card. "
             "The import is processed asynchronously. Use the returned report_id to check status via the import-reports endpoint."
         ),
         request={
@@ -38,7 +39,15 @@ class CSVImportView(APIView):
                         "type": "string",
                         "format": "binary",
                         "description": "CSV file containing transactions",
-                    }
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "description": "Optional: ID of the bank account to associate with all imported transactions",
+                    },
+                    "credit_card_id": {
+                        "type": "integer",
+                        "description": "Optional: ID of the credit card to associate with all imported transactions",
+                    },
                 },
                 "required": ["file"],
             }
@@ -78,12 +87,14 @@ class CSVImportView(APIView):
         Returns:
             Response with report_id and status endpoint (202 Accepted).
         """
-        serializer = CSVImportSerializer(data=request.data)
+        serializer = CSVImportSerializer(data=request.data, context={"request": request})
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         csv_file = serializer.validated_data["file"]
+        account_id = serializer.validated_data.get("account_id")
+        credit_card_id = serializer.validated_data.get("credit_card_id")
 
         try:
             storage_service = get_file_storage_service()
@@ -98,6 +109,8 @@ class CSVImportView(APIView):
                 status=ImportedReport.Status.SENT,
                 file_name=csv_file.name,
                 file_path=file_path,
+                account_id=account_id,
+                credit_card_id=credit_card_id,
             )
 
             process_csv_import_task.delay(imported_report.id)

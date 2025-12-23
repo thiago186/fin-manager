@@ -74,7 +74,9 @@ class CSVImportService:
 
             file_path = self.storage_service.get_file_path(imported_report.file_path)
 
-            result = self.import_transactions(file_path)
+            result = self.import_transactions(
+                file_path, imported_report=imported_report
+            )
 
             handler_type = result.get("handler_type", "")
 
@@ -155,11 +157,14 @@ class CSVImportService:
 
             raise
 
-    def import_transactions(self, file_path: str) -> dict[str, Any]:
+    def import_transactions(
+        self, file_path: str, imported_report: ImportedReport | None = None
+    ) -> dict[str, Any]:
         """Import transactions from CSV file.
 
         Args:
             file_path: Path to the CSV file.
+            imported_report: Optional ImportedReport instance with account/credit_card association.
 
         Returns:
             Dictionary with import results:
@@ -193,7 +198,9 @@ class CSVImportService:
             handler_type=handler_type,
         )
 
-        result = self._process_transactions(transactions)
+        result = self._process_transactions(
+            transactions, imported_report=imported_report
+        )
         result["handler_type"] = handler_type
 
         logger.info(
@@ -205,7 +212,11 @@ class CSVImportService:
 
         return result
 
-    def _process_transactions(self, transactions: list[Transaction]) -> dict[str, Any]:
+    def _process_transactions(
+        self,
+        transactions: list[Transaction],
+        imported_report: ImportedReport | None = None,
+    ) -> dict[str, Any]:
         """Process and save transactions with matching logic.
 
         All transactions are processed in a single database transaction.
@@ -214,6 +225,7 @@ class CSVImportService:
 
         Args:
             transactions: List of parsed Transaction objects.
+            imported_report: Optional ImportedReport instance with account/credit_card association.
 
         Returns:
             Dictionary with import results.
@@ -229,6 +241,23 @@ class CSVImportService:
             user_id=self.user.id,  # type: ignore
         )
 
+        # Get account/credit_card from imported_report if provided
+        report_account = imported_report.account if imported_report else None
+        report_credit_card = imported_report.credit_card if imported_report else None
+
+        if report_account:
+            logger.info(
+                "Using account from import report",
+                account_id=report_account.id,  # type: ignore
+                account_name=report_account.name,
+            )
+        if report_credit_card:
+            logger.info(
+                "Using credit card from import report",
+                credit_card_id=report_credit_card.id,  # type: ignore
+                credit_card_name=report_credit_card.name,
+            )
+
         for idx, transaction in enumerate(transactions, start=1):
             try:
                 if idx % 10 == 0 or idx == total_transactions:
@@ -238,7 +267,7 @@ class CSVImportService:
                         total_count=total_transactions,
                     )
 
-                # Match account if identifier provided
+                # Match account if identifier provided in CSV
                 if (
                     hasattr(transaction, "_csv_account_identifier")
                     and transaction._csv_account_identifier
@@ -247,13 +276,22 @@ class CSVImportService:
                     if account:
                         transaction.account = account
                         logger.debug(
-                            "Matched account",
+                            "Matched account from CSV",
                             transaction_index=idx,
                             account_id=account.id,  # type: ignore
                             account_name=account.name,
                         )
+                # Otherwise, use account from import report if provided
+                elif report_account:
+                    transaction.account = report_account
+                    logger.debug(
+                        "Using account from import report",
+                        transaction_index=idx,
+                        account_id=report_account.id,  # type: ignore
+                        account_name=report_account.name,
+                    )
 
-                # Match credit card if identifier provided
+                # Match credit card if identifier provided in CSV
                 if (
                     hasattr(transaction, "_csv_credit_card_identifier")
                     and transaction._csv_credit_card_identifier
@@ -264,11 +302,20 @@ class CSVImportService:
                     if credit_card:
                         transaction.credit_card = credit_card
                         logger.debug(
-                            "Matched credit card",
+                            "Matched credit card from CSV",
                             transaction_index=idx,
                             credit_card_id=credit_card.id,  # type: ignore
                             credit_card_name=credit_card.name,
                         )
+                # Otherwise, use credit card from import report if provided
+                elif report_credit_card:
+                    transaction.credit_card = report_credit_card
+                    logger.debug(
+                        "Using credit card from import report",
+                        transaction_index=idx,
+                        credit_card_id=report_credit_card.id,  # type: ignore
+                        credit_card_name=report_credit_card.name,
+                    )
 
                 # Match category if name provided
                 if (
