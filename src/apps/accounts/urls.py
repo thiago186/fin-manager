@@ -18,6 +18,10 @@ router.register("import-reports", ImportedReportViewSet, basename="import-report
 router.register("cash-flow-views", CashFlowViewViewSet, basename="cash-flow-view")
 
 urlpatterns = [
-    path("transactions/import-csv/", CSVImportView.as_view(), name="transaction-import-csv"),
+    path(
+        "transactions/import-report/",
+        CSVImportView.as_view(),
+        name="transaction-import-report",
+    ),
     path("", include(router.urls)),
 ]
