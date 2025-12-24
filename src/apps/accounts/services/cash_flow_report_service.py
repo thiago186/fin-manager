@@ -4,7 +4,7 @@ from typing import Any
 import structlog
 
 from django.contrib.auth.models import User
-from django.db.models import Case, DecimalField, F, Sum, When
+from django.db.models import Case, DecimalField, F, Q, Sum, When
 from django.db.models.functions import TruncMonth
 
 from apps.accounts.models.cash_flow_view import (
@@ -131,6 +131,32 @@ class CashFlowReportService:
                         for month, total in monthly_totals.items()
                     },
                     "annual_total": str(annual_total),
+                }
+            )
+
+        uncategorized_monthly_totals = self._calculate_uncategorized_transactions_monthly_totals(
+            view, year
+        )
+        uncategorized_annual_total = sum(uncategorized_monthly_totals.values())
+
+        if uncategorized_annual_total != Decimal("0.00"):
+            logger.debug(
+                "Adding uncategorized item to report",
+                view_id=view.id,
+                view_name=view.name,
+                year=year,
+                annual_total=str(uncategorized_annual_total),
+            )
+
+            items.append(
+                {
+                    "type": "uncategorized",
+                    "name": "Uncategorized",
+                    "monthly_totals": {
+                        str(month): str(total)
+                        for month, total in uncategorized_monthly_totals.items()
+                    },
+                    "annual_total": str(uncategorized_annual_total),
                 }
             )
 
@@ -519,6 +545,124 @@ class CashFlowReportService:
         for entry in monthly_data:
             month = entry["month"].month
             monthly_totals[month] = entry["total"]
+
+        return monthly_totals
+
+    def _calculate_uncategorized_transactions_monthly_totals(
+        self, view: CashFlowView, year: int
+    ) -> dict[int, Decimal]:
+        """Calculate monthly totals for uncategorized transactions.
+
+        Includes transactions with no category and transactions with categories
+        not included in any group of the cash flow view.
+
+        Args:
+            view: The CashFlowView to calculate uncategorized totals for.
+            year: The year to calculate totals for.
+
+        Returns:
+            Dictionary mapping month number (1-12) to total amount for that month.
+        """
+        groups = view.groups.all()
+        group_category_ids = set()
+        for group in groups:
+            category_ids = list(group.categories.values_list("id", flat=True))
+            group_category_ids.update(category_ids)
+
+        logger.debug(
+            "Calculating uncategorized transactions monthly totals",
+            view_id=view.id,
+            view_name=view.name,
+            year=year,
+            group_category_ids=list(group_category_ids),
+            group_category_count=len(group_category_ids),
+        )
+
+        if group_category_ids:
+            transactions = Transaction.objects.filter(
+                user=self.user,
+                occurred_at__year=year,
+            ).filter(
+                Q(category__isnull=True) | ~Q(category_id__in=group_category_ids)
+            )
+        else:
+            transactions = Transaction.objects.filter(
+                user=self.user,
+                occurred_at__year=year,
+            )
+
+        transactions_with_category = transactions.filter(category__isnull=False)
+        transactions_without_category = transactions.filter(category__isnull=True)
+
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
+
+        if transactions_with_category.exists():
+            monthly_data_with_category = (
+                transactions_with_category.annotate(month=TruncMonth("occurred_at"))
+                .values("month")
+                .annotate(
+                    total=Sum(
+                        Case(
+                            When(
+                                category__transaction_type=Category.TransactionType.INCOME,
+                                then="amount",
+                            ),
+                            When(
+                                category__transaction_type=Category.TransactionType.EXPENSE,
+                                then=-1 * F("amount"),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=DecimalField(max_digits=12, decimal_places=2),
+                        )
+                    )
+                )
+                .order_by("month")
+            )
+
+            for entry in monthly_data_with_category:
+                month = entry["month"].month
+                monthly_totals[month] += entry["total"]
+
+        if transactions_without_category.exists():
+            monthly_data_without_category = (
+                transactions_without_category.annotate(month=TruncMonth("occurred_at"))
+                .values("month")
+                .annotate(
+                    total=Sum(
+                        Case(
+                            When(
+                                transaction_type=Transaction.TransactionType.INCOME,
+                                then="amount",
+                            ),
+                            When(
+                                transaction_type=Transaction.TransactionType.EXPENSE,
+                                then=-1 * F("amount"),
+                            ),
+                            default=Decimal("0.00"),
+                            output_field=DecimalField(max_digits=12, decimal_places=2),
+                        )
+                    )
+                )
+                .order_by("month")
+            )
+
+            for entry in monthly_data_without_category:
+                month = entry["month"].month
+                monthly_totals[month] += entry["total"]
+
+        months_with_data = [
+            month for month, total in monthly_totals.items() if total != Decimal("0.00")
+        ]
+        logger.debug(
+            "Uncategorized transactions monthly totals calculated",
+            view_id=view.id,
+            view_name=view.name,
+            year=year,
+            months_with_data=months_with_data,
+            months_with_data_count=len(months_with_data),
+        )
 
         return monthly_totals
 

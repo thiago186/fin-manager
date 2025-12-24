@@ -265,6 +265,15 @@ class ResultReportItemSerializer(serializers.Serializer):
     annual_total = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
+class UncategorizedReportItemSerializer(serializers.Serializer):
+    """Serializer for uncategorized items in report."""
+
+    type = serializers.CharField(default="uncategorized")
+    name = serializers.CharField()
+    monthly_totals = MonthlyTotalsSerializer()
+    annual_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
 class CashFlowReportSerializer(serializers.Serializer):
     """Serializer for cash flow report response."""
 
