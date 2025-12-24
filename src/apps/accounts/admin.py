@@ -6,6 +6,9 @@ from django.http import HttpRequest
 
 from apps.accounts.models import (
     Account,
+    CashFlowGroup,
+    CashFlowResult,
+    CashFlowView,
     Category,
     CreditCard,
     ImportedReport,
@@ -472,3 +475,230 @@ class ImportedReportAdmin(admin.ModelAdmin):
             request,
             f"Successfully scheduled {count} import{'s' if count != 1 else ''} for re-processing.",
         )
+
+
+class CashFlowGroupInline(admin.TabularInline):
+    """Inline admin for CashFlowGroup within CashFlowView."""
+
+    model = CashFlowGroup
+    extra = 0
+    fields = [
+        "name",
+        "position",
+        "categories",
+    ]
+    autocomplete_fields = [
+        "categories",
+    ]
+    filter_horizontal = [
+        "categories",
+    ]
+
+
+class CashFlowResultInline(admin.TabularInline):
+    """Inline admin for CashFlowResult within CashFlowView."""
+
+    model = CashFlowResult
+    extra = 0
+    fields = [
+        "name",
+        "position",
+    ]
+
+
+@admin.register(CashFlowView)
+class CashFlowViewAdmin(admin.ModelAdmin):
+    """Admin configuration for the CashFlowView model."""
+
+    list_display = [
+        "name",
+        "user",
+        "groups_count",
+        "results_count",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "name",
+        "user__username",
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    ordering = [
+        "-created_at",
+    ]
+    inlines = [
+        CashFlowGroupInline,
+        CashFlowResultInline,
+    ]
+
+    fieldsets = (
+        ("Basic Information", {"fields": ("user", "name")}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CashFlowView]:
+        """Optimize queryset with select_related and prefetch_related for better performance."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("user")
+            .prefetch_related("groups", "results")
+        )
+
+    def groups_count(self, obj: CashFlowView) -> int:
+        """Get the number of groups in this view."""
+        return obj.groups.count()
+
+    groups_count.short_description = "Groups"
+
+    def results_count(self, obj: CashFlowView) -> int:
+        """Get the number of results in this view."""
+        return obj.results.count()
+
+    results_count.short_description = "Results"
+
+
+@admin.register(CashFlowGroup)
+class CashFlowGroupAdmin(admin.ModelAdmin):
+    """Admin configuration for the CashFlowGroup model."""
+
+    list_display = [
+        "name",
+        "cash_flow_view",
+        "user",
+        "position",
+        "categories_count",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "cash_flow_view",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "name",
+        "cash_flow_view__name",
+        "cash_flow_view__user__username",
+        "cash_flow_view__user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    ordering = [
+        "cash_flow_view",
+        "position",
+    ]
+    autocomplete_fields = [
+        "cash_flow_view",
+        "categories",
+    ]
+    filter_horizontal = [
+        "categories",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("cash_flow_view", "name", "position")},
+        ),
+        ("Categories", {"fields": ("categories",)}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CashFlowGroup]:
+        """Optimize queryset with select_related and prefetch_related for better performance."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("cash_flow_view", "cash_flow_view__user")
+            .prefetch_related("categories")
+        )
+
+    def user(self, obj: CashFlowGroup) -> str:
+        """Get the user who owns the cash flow view."""
+        return obj.cash_flow_view.user
+
+    user.short_description = "User"
+
+    def categories_count(self, obj: CashFlowGroup) -> int:
+        """Get the number of categories in this group."""
+        return obj.categories.count()
+
+    categories_count.short_description = "Categories"
+
+
+@admin.register(CashFlowResult)
+class CashFlowResultAdmin(admin.ModelAdmin):
+    """Admin configuration for the CashFlowResult model."""
+
+    list_display = [
+        "name",
+        "cash_flow_view",
+        "user",
+        "position",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "cash_flow_view",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "name",
+        "cash_flow_view__name",
+        "cash_flow_view__user__username",
+        "cash_flow_view__user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    ordering = [
+        "cash_flow_view",
+        "position",
+    ]
+    autocomplete_fields = [
+        "cash_flow_view",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("cash_flow_view", "name", "position")},
+        ),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[CashFlowResult]:
+        """Optimize queryset with select_related for better performance."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("cash_flow_view", "cash_flow_view__user")
+        )
+
+    def user(self, obj: CashFlowResult) -> str:
+        """Get the user who owns the cash flow view."""
+        return obj.cash_flow_view.user
+
+    user.short_description = "User"
