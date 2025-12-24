@@ -4,7 +4,11 @@ import pytest
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from apps.accounts.models.cash_flow_view import CashFlowGroup, CashFlowResult, CashFlowView
+from apps.accounts.models.cash_flow_view import (
+    CashFlowGroup,
+    CashFlowResult,
+    CashFlowView,
+)
 from apps.accounts.models.categories import Category
 from apps.accounts.models.transaction import Transaction
 from apps.accounts.services.cash_flow_report_service import CashFlowReportService
@@ -28,9 +32,7 @@ def test_generate_report_with_groups() -> None:
     )
     group1.categories.add(category1)
 
-    group2 = CashFlowGroup.objects.create(
-        cash_flow_view=view, name="Costs", position=2
-    )
+    group2 = CashFlowGroup.objects.create(cash_flow_view=view, name="Costs", position=2)
     group2.categories.add(category2)
 
     Transaction.objects.create(
@@ -80,9 +82,7 @@ def test_generate_report_with_results() -> None:
     )
     group1.categories.add(category1)
 
-    group2 = CashFlowGroup.objects.create(
-        cash_flow_view=view, name="Costs", position=2
-    )
+    group2 = CashFlowGroup.objects.create(cash_flow_view=view, name="Costs", position=2)
     group2.categories.add(category2)
 
     result = CashFlowResult.objects.create(
@@ -133,4 +133,3 @@ def test_report_empty_group() -> None:
         Decimal(total) == Decimal("0.00")
         for total in report["items"][0]["monthly_totals"].values()
     )
-

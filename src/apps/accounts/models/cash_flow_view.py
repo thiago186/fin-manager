@@ -6,7 +6,6 @@ from django.db import models
 
 from apps.accounts.models.categories import Category
 
-
 class CashFlowView(models.Model):
     """
     Represents a user-configurable cash flow view configuration.
@@ -36,6 +35,8 @@ class CashFlowView(models.Model):
 
     # Type hints
     id: int
+    groups: models.Manager["CashFlowGroup"]
+    results: models.Manager["CashFlowResult"]
 
     class Meta:
         """Meta options for the CashFlowView model."""

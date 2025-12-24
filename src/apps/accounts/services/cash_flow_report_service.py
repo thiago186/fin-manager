@@ -1,13 +1,21 @@
 from decimal import Decimal
 from typing import Any
 
+import structlog
+
 from django.contrib.auth.models import User
 from django.db.models import Case, DecimalField, F, Sum, When
 from django.db.models.functions import TruncMonth
 
-from apps.accounts.models.cash_flow_view import CashFlowGroup, CashFlowResult, CashFlowView
+from apps.accounts.models.cash_flow_view import (
+    CashFlowGroup,
+    CashFlowResult,
+    CashFlowView,
+)
 from apps.accounts.models.categories import Category
 from apps.accounts.models.transaction import Transaction
+
+logger = structlog.stdlib.get_logger()
 
 
 class CashFlowReportService:
@@ -31,13 +39,36 @@ class CashFlowReportService:
         Returns:
             Dictionary containing the report data with monthly totals for each group and result.
         """
+        logger.info(
+            "Starting cash flow report generation",
+            view_id=view.id,
+            view_name=view.name,
+            year=year,
+            user_id=self.user.pk,
+        )
+
         groups = view.groups.all().order_by("position")
         results = view.results.all().order_by("position")
+
+        logger.debug(
+            "Retrieved groups and results",
+            view_id=view.id,
+            groups_count=groups.count(),
+            results_count=results.count(),
+        )
 
         items = []
         group_totals: dict[int, dict[int, Decimal]] = {}
 
         for group in groups:
+            logger.debug(
+                "Processing group",
+                view_id=view.id,
+                group_id=group.id,
+                group_name=group.name,
+                group_position=group.position,
+            )
+
             monthly_totals = self._calculate_group_monthly_totals(group, year)
             annual_total = sum(monthly_totals.values())
             group_totals[group.position] = monthly_totals
@@ -46,6 +77,15 @@ class CashFlowReportService:
                 {"id": cat.id, "name": cat.name} for cat in group.categories.all()
             ]
 
+            logger.debug(
+                "Group totals calculated",
+                view_id=view.id,
+                group_id=group.id,
+                group_name=group.name,
+                annual_total=str(annual_total),
+                categories_count=len(categories),
+            )
+
             items.append(
                 {
                     "type": "group",
@@ -53,17 +93,34 @@ class CashFlowReportService:
                     "position": group.position,
                     "categories": categories,
                     "monthly_totals": {
-                        str(month): str(total) for month, total in monthly_totals.items()
+                        str(month): str(total)
+                        for month, total in monthly_totals.items()
                     },
                     "annual_total": str(annual_total),
                 }
             )
 
         for result in results:
+            logger.debug(
+                "Processing result",
+                view_id=view.id,
+                result_id=result.id,
+                result_name=result.name,
+                result_position=result.position,
+            )
+
             monthly_totals = self._calculate_result_monthly_totals(
                 result, group_totals, year
             )
             annual_total = sum(monthly_totals.values())
+
+            logger.debug(
+                "Result totals calculated",
+                view_id=view.id,
+                result_id=result.id,
+                result_name=result.name,
+                annual_total=str(annual_total),
+            )
 
             items.append(
                 {
@@ -71,11 +128,20 @@ class CashFlowReportService:
                     "name": result.name,
                     "position": result.position,
                     "monthly_totals": {
-                        str(month): str(total) for month, total in monthly_totals.items()
+                        str(month): str(total)
+                        for month, total in monthly_totals.items()
                     },
                     "annual_total": str(annual_total),
                 }
             )
+
+        logger.info(
+            "Cash flow report generation completed",
+            view_id=view.id,
+            view_name=view.name,
+            year=year,
+            items_count=len(items),
+        )
 
         return {
             "view_id": view.id,
@@ -98,12 +164,36 @@ class CashFlowReportService:
         """
         category_ids = list(group.categories.values_list("id", flat=True))
         if not category_ids:
+            logger.warning(
+                "Group has no categories, returning zero totals",
+                group_id=group.id,
+                group_name=group.name,
+                year=year,
+            )
             return {month: Decimal("0.00") for month in range(1, 13)}
+
+        logger.debug(
+            "Calculating group monthly totals",
+            group_id=group.id,
+            group_name=group.name,
+            year=year,
+            category_ids=category_ids,
+            categories_count=len(category_ids),
+        )
 
         transactions = Transaction.objects.filter(
             user=self.user,
             category_id__in=category_ids,
             occurred_at__year=year,
+        )
+
+        transactions_count = transactions.count()
+        logger.debug(
+            "Found transactions for group",
+            group_id=group.id,
+            group_name=group.name,
+            year=year,
+            transactions_count=transactions_count,
         )
 
         monthly_data = (
@@ -128,11 +218,24 @@ class CashFlowReportService:
             .order_by("month")
         )
 
-        monthly_totals: dict[int, Decimal] = {month: Decimal("0.00") for month in range(1, 13)}
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
 
+        months_with_data = []
         for entry in monthly_data:
             month = entry["month"].month
             monthly_totals[month] = entry["total"]
+            months_with_data.append(month)
+
+        logger.debug(
+            "Group monthly totals calculated",
+            group_id=group.id,
+            group_name=group.name,
+            year=year,
+            months_with_data=months_with_data,
+            months_with_data_count=len(months_with_data),
+        )
 
         return monthly_totals
 
@@ -154,14 +257,35 @@ class CashFlowReportService:
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
         """
-        monthly_totals: dict[int, Decimal] = {month: Decimal("0.00") for month in range(1, 13)}
+        logger.debug(
+            "Calculating result monthly totals",
+            result_id=result.id,
+            result_name=result.name,
+            result_position=result.position,
+            year=year,
+            available_group_positions=list(group_totals.keys()),
+        )
 
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
+
+        included_groups = []
         for group_position, group_monthly_totals in group_totals.items():
             if group_position < result.position:
+                included_groups.append(group_position)
                 for month in range(1, 13):
                     monthly_totals[month] += group_monthly_totals.get(
                         month, Decimal("0.00")
                     )
 
-        return monthly_totals
+        logger.debug(
+            "Result monthly totals calculated",
+            result_id=result.id,
+            result_name=result.name,
+            result_position=result.position,
+            included_group_positions=included_groups,
+            included_groups_count=len(included_groups),
+        )
 
+        return monthly_totals

@@ -2,7 +2,11 @@ from typing import Any
 
 from rest_framework import serializers
 
-from apps.accounts.models.cash_flow_view import CashFlowGroup, CashFlowResult, CashFlowView
+from apps.accounts.models.cash_flow_view import (
+    CashFlowGroup,
+    CashFlowResult,
+    CashFlowView,
+)
 from apps.accounts.models.categories import Category
 from apps.accounts.serializers.categories import CategoryListSerializer
 
@@ -130,19 +134,19 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
         view = CashFlowView.objects.create(**validated_data)
 
         for group_data in groups_data:
-            # Handle both category_ids (write-only) and categories (read-only) fields
-            # category_ids maps to categories via source="categories"
-            category_ids = group_data.pop("categories", group_data.pop("category_ids", []))
+            categories = group_data.pop("categories", [])
             group = CashFlowGroup.objects.create(cash_flow_view=view, **group_data)
-            if category_ids:
-                group.categories.set(category_ids)
+            if categories:
+                group.categories.set(categories)
 
         for result_data in results_data:
             CashFlowResult.objects.create(cash_flow_view=view, **result_data)
 
         return view
 
-    def update(self, instance: CashFlowView, validated_data: dict[str, Any]) -> CashFlowView:
+    def update(
+        self, instance: CashFlowView, validated_data: dict[str, Any]
+    ) -> CashFlowView:
         """Update a cash flow view with nested groups and results."""
         groups_data = validated_data.pop("groups", None)
         results_data = validated_data.pop("results", None)
@@ -157,29 +161,31 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
 
             for group_data in groups_data:
                 group_id = group_data.get("id")
-                # Handle both category_ids (write-only) and categories (read-only) fields
-                # category_ids maps to categories via source="categories"
-                category_ids = group_data.pop("categories", group_data.pop("category_ids", []))
+                categories = group_data.pop("categories", [])
                 group_data.pop("id", None)
 
                 if group_id and group_id in existing_group_ids:
-                    group = CashFlowGroup.objects.get(id=group_id, cash_flow_view=instance)
+                    group = CashFlowGroup.objects.get(
+                        id=group_id, cash_flow_view=instance
+                    )
                     for attr, value in group_data.items():
                         setattr(group, attr, value)
                     group.save()
-                    if category_ids is not None:
-                        group.categories.set(category_ids)
+                    if categories is not None:
+                        group.categories.set(categories)
                     updated_group_ids.add(group_id)
                 else:
                     group = CashFlowGroup.objects.create(
                         cash_flow_view=instance, **group_data
                     )
-                    if category_ids:
-                        group.categories.set(category_ids)
+                    if categories:
+                        group.categories.set(categories)
                     updated_group_ids.add(group.id)
 
             for group_id in existing_group_ids - updated_group_ids:
-                CashFlowGroup.objects.filter(id=group_id, cash_flow_view=instance).delete()
+                CashFlowGroup.objects.filter(
+                    id=group_id, cash_flow_view=instance
+                ).delete()
 
         if results_data is not None:
             existing_result_ids = {result.id for result in instance.results.all()}
@@ -190,7 +196,9 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
                 result_data.pop("id", None)
 
                 if result_id and result_id in existing_result_ids:
-                    result = CashFlowResult.objects.get(id=result_id, cash_flow_view=instance)
+                    result = CashFlowResult.objects.get(
+                        id=result_id, cash_flow_view=instance
+                    )
                     for attr, value in result_data.items():
                         setattr(result, attr, value)
                     result.save()
@@ -202,7 +210,9 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
                     updated_result_ids.add(result.id)
 
             for result_id in existing_result_ids - updated_result_ids:
-                CashFlowResult.objects.filter(id=result_id, cash_flow_view=instance).delete()
+                CashFlowResult.objects.filter(
+                    id=result_id, cash_flow_view=instance
+                ).delete()
 
         return instance
 
@@ -249,7 +259,4 @@ class CashFlowReportSerializer(serializers.Serializer):
     view_id = serializers.IntegerField()
     view_name = serializers.CharField()
     year = serializers.IntegerField()
-    items = serializers.ListField(
-        child=serializers.DictField(), allow_empty=True
-    )
-
+    items = serializers.ListField(child=serializers.DictField(), allow_empty=True)

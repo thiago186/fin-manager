@@ -203,14 +203,16 @@ class CashFlowViewViewSet(ModelViewSet):
 
         if not year_param:
             return Response(
-                {"error": "Year parameter is required"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Year parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             year = int(year_param)
         except ValueError:
             return Response(
-                {"error": "Year must be a valid integer"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Year must be a valid integer"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if year < 1900 or year > 2100:
@@ -226,4 +228,3 @@ class CashFlowViewViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
-
