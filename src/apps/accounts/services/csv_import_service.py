@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Union
 
 import structlog
 from django.contrib.auth.models import User
 from django.db import transaction as db_transaction
 
+from apps.accounts.interfaces.csv_handler import BaseCSVHandler
+from apps.accounts.interfaces.json_handler import BaseJsonHandler
 from apps.accounts.models.account import Account
 from apps.accounts.models.categories import Category
 from apps.accounts.models.credit_card import CreditCard
@@ -14,15 +16,16 @@ from apps.accounts.models.transaction import Transaction
 from apps.accounts.models.transaction_tag import Tag
 from apps.accounts.services.csv_import_factory import CSVImportFactory
 from apps.accounts.services.file_storage_service import get_file_storage_service
+from apps.accounts.services.json_import_factory import JSONImportFactory
 
 logger = structlog.stdlib.get_logger()
 
 
 class CSVImportService:
-    """Service for importing transactions from CSV files."""
+    """Service for importing transactions from CSV or JSON files."""
 
     def __init__(self, user: User):
-        """Initialize the CSV import service.
+        """Initialize the import service.
 
         Args:
             user: The user who owns the transactions to be imported.
@@ -31,7 +34,7 @@ class CSVImportService:
         self.storage_service = get_file_storage_service()
 
     def process_import_report(self, imported_report_id: int) -> None:
-        """Process CSV import report asynchronously.
+        """Process import report asynchronously.
 
         This method handles all business logic for processing an import report:
         - Updates status to PROCESSING
@@ -55,11 +58,14 @@ class CSVImportService:
             )
             raise
 
+        file_format = self._detect_file_format(imported_report.file_name)
+
         logger.info(
-            "Starting CSV import processing",
+            "Starting import processing",
             imported_report_id=imported_report_id,
             file_name=imported_report.file_name,
             file_path=imported_report.file_path,
+            file_format=file_format,
             user_id=self.user.id,  # type: ignore
         )
 
@@ -160,10 +166,10 @@ class CSVImportService:
     def import_transactions(
         self, file_path: str, imported_report: ImportedReport | None = None
     ) -> dict[str, Any]:
-        """Import transactions from CSV file.
+        """Import transactions from CSV or JSON file.
 
         Args:
-            file_path: Path to the CSV file.
+            file_path: Path to the CSV or JSON file.
             imported_report: Optional ImportedReport instance with account/credit_card association.
 
         Returns:
@@ -181,19 +187,29 @@ class CSVImportService:
             user_id=self.user.id,  # type: ignore
         )
 
-        handler = CSVImportFactory.create_handler(file_path)
+        file_format = self._detect_file_format(file_path)
+
+        handler: Union[BaseCSVHandler, BaseJsonHandler]
+        if file_format == "json":
+            handler = JSONImportFactory.create_handler(file_path)
+            format_name = "JSON"
+        else:
+            handler = CSVImportFactory.create_handler(file_path)
+            format_name = "CSV"
+
         handler_type = type(handler).__name__
 
         logger.info(
-            "Handler selected for CSV import",
+            f"Handler selected for {format_name} import",
             handler_type=handler_type,
             file_path=file_path,
+            file_format=file_format,
         )
 
         transactions = handler.parse_transactions_from_file(file_path, self.user)
 
         logger.info(
-            "Parsed transactions from CSV",
+            f"Parsed transactions from {format_name}",
             transaction_count=len(transactions),
             handler_type=handler_type,
         )
@@ -267,16 +283,25 @@ class CSVImportService:
                         total_count=total_transactions,
                     )
 
-                # Match account if identifier provided in CSV
+                # Match account if identifier provided in file
+                account_identifier = None
                 if (
                     hasattr(transaction, "_csv_account_identifier")
                     and transaction._csv_account_identifier
                 ):  # type: ignore
-                    account = self._match_account(transaction._csv_account_identifier)  # type: ignore
+                    account_identifier = transaction._csv_account_identifier  # type: ignore
+                elif (
+                    hasattr(transaction, "_json_account_identifier")
+                    and transaction._json_account_identifier
+                ):  # type: ignore
+                    account_identifier = transaction._json_account_identifier  # type: ignore
+
+                if account_identifier:
+                    account = self._match_account(account_identifier)
                     if account:
                         transaction.account = account
                         logger.debug(
-                            "Matched account from CSV",
+                            "Matched account from file",
                             transaction_index=idx,
                             account_id=account.id,  # type: ignore
                             account_name=account.name,
@@ -291,18 +316,25 @@ class CSVImportService:
                         account_name=report_account.name,
                     )
 
-                # Match credit card if identifier provided in CSV
+                # Match credit card if identifier provided in file
+                credit_card_identifier = None
                 if (
                     hasattr(transaction, "_csv_credit_card_identifier")
                     and transaction._csv_credit_card_identifier
                 ):  # type: ignore
-                    credit_card = self._match_credit_card(
-                        transaction._csv_credit_card_identifier
-                    )  # type: ignore
+                    credit_card_identifier = transaction._csv_credit_card_identifier  # type: ignore
+                elif (
+                    hasattr(transaction, "_json_credit_card_identifier")
+                    and transaction._json_credit_card_identifier
+                ):  # type: ignore
+                    credit_card_identifier = transaction._json_credit_card_identifier  # type: ignore
+
+                if credit_card_identifier:
+                    credit_card = self._match_credit_card(credit_card_identifier)
                     if credit_card:
                         transaction.credit_card = credit_card
                         logger.debug(
-                            "Matched credit card from CSV",
+                            "Matched credit card from file",
                             transaction_index=idx,
                             credit_card_id=credit_card.id,  # type: ignore
                             credit_card_name=credit_card.name,
@@ -318,10 +350,19 @@ class CSVImportService:
                     )
 
                 # Match category if name provided
+                category_name = None
                 if (
                     hasattr(transaction, "_csv_category_name")
                     and transaction._csv_category_name
                 ):  # type: ignore
+                    category_name = transaction._csv_category_name  # type: ignore
+                elif (
+                    hasattr(transaction, "_json_category_name")
+                    and transaction._json_category_name
+                ):  # type: ignore
+                    category_name = transaction._json_category_name  # type: ignore
+
+                if category_name:
                     # Convert Transaction.TransactionType to Category.TransactionType
                     transaction_type_str = transaction.transaction_type.lower()
                     category_transaction_type = (
@@ -330,7 +371,7 @@ class CSVImportService:
                         else Category.TransactionType.EXPENSE
                     )
                     category = self._match_category_by_name(
-                        transaction._csv_category_name,  # type: ignore
+                        category_name,
                         category_transaction_type,
                     )
                     if category:
@@ -342,10 +383,19 @@ class CSVImportService:
                             category_name=category.name,
                         )
 
+                subcategory_name = None
                 if (
                     hasattr(transaction, "_csv_subcategory_name")
                     and transaction._csv_subcategory_name
                 ):  # type: ignore
+                    subcategory_name = transaction._csv_subcategory_name  # type: ignore
+                elif (
+                    hasattr(transaction, "_json_subcategory_name")
+                    and transaction._json_subcategory_name
+                ):  # type: ignore
+                    subcategory_name = transaction._json_subcategory_name  # type: ignore
+
+                if subcategory_name:
                     parent_category = transaction.category
                     if not parent_category:
                         error_msg = f"Transaction {idx}: Cannot set subcategory without category"
@@ -356,7 +406,7 @@ class CSVImportService:
                         )
                     else:
                         subcategory = self._match_subcategory_by_name(
-                            transaction._csv_subcategory_name,  # type: ignore
+                            subcategory_name,
                             parent_category,
                         )
                         if subcategory:
@@ -373,11 +423,20 @@ class CSVImportService:
 
                 # Store tags for later assignment
                 tags_to_set: list[Tag] = []
+                tags_value = None
                 if (
                     hasattr(transaction, "_csv_tags_value")
                     and transaction._csv_tags_value
                 ):  # type: ignore
-                    tags_to_set = self._match_tags(transaction._csv_tags_value)  # type: ignore
+                    tags_value = transaction._csv_tags_value  # type: ignore
+                elif (
+                    hasattr(transaction, "_json_tags_value")
+                    and transaction._json_tags_value
+                ):  # type: ignore
+                    tags_value = transaction._json_tags_value  # type: ignore
+
+                if tags_value:
+                    tags_to_set = self._match_tags(tags_value)
                     transaction._tags_to_set = tags_to_set  # type: ignore
                     if tags_to_set:
                         logger.debug(
@@ -565,17 +624,26 @@ class CSVImportService:
         ).first()
         return credit_card
 
-    def _match_tags(self, tag_names: str) -> list[Tag]:
+    def _match_tags(self, tag_names: str | list[str]) -> list[Tag]:
         """Match tags by name (create if not exists).
 
         Args:
-            tag_names: Comma-separated tag names.
+            tag_names: Comma-separated tag names string or list of tag names.
 
         Returns:
             List of Tag instances.
         """
         tags: list[Tag] = []
-        tag_name_list = [name.strip() for name in tag_names.split(",") if name.strip()]
+
+        # Handle both string and list inputs
+        if isinstance(tag_names, str):
+            tag_name_list = [
+                name.strip() for name in tag_names.split(",") if name.strip()
+            ]
+        elif isinstance(tag_names, list):
+            tag_name_list = [str(name).strip() for name in tag_names if name]
+        else:
+            return tags
 
         for tag_name in tag_name_list:
             # Try to find existing tag
@@ -588,3 +656,26 @@ class CSVImportService:
             tags.append(tag)
 
         return tags
+
+    def _detect_file_format(self, file_path: str) -> str:
+        """Detect file format from file path.
+
+        Args:
+            file_path: Path to the file.
+
+        Returns:
+            File format string: "csv" or "json".
+        """
+        file_path_lower = file_path.lower()
+
+        if file_path_lower.endswith(".json"):
+            return "json"
+        elif file_path_lower.endswith(".csv"):
+            return "csv"
+        else:
+            # Default to CSV for backward compatibility
+            logger.warning(
+                "Unknown file extension, defaulting to CSV",
+                file_path=file_path,
+            )
+            return "csv"

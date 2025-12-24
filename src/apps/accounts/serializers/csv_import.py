@@ -7,9 +7,11 @@ from apps.accounts.models.credit_card import CreditCard
 
 
 class CSVImportSerializer(serializers.Serializer):
-    """Serializer for CSV file upload validation."""
+    """Serializer for CSV or JSON file upload validation."""
 
-    file = serializers.FileField(help_text="CSV file containing transactions to import")
+    file = serializers.FileField(
+        help_text="CSV or JSON file containing transactions to import"
+    )
     account_id = serializers.IntegerField(
         required=False,
         allow_null=True,
@@ -22,7 +24,7 @@ class CSVImportSerializer(serializers.Serializer):
     )
 
     def validate_file(self, value: Any) -> Any:
-        """Validate that the uploaded file is a CSV file.
+        """Validate that the uploaded file is a CSV or JSON file.
 
         Args:
             value: Uploaded file.
@@ -31,23 +33,31 @@ class CSVImportSerializer(serializers.Serializer):
             Validated file.
 
         Raises:
-            serializers.ValidationError: If file is not a CSV file.
+            serializers.ValidationError: If file is not a CSV or JSON file.
         """
-        if not value.name.endswith(".csv"):
+        file_name_lower = value.name.lower()
+
+        if not (file_name_lower.endswith(".csv") or file_name_lower.endswith(".json")):
             raise serializers.ValidationError(
-                "File must be a CSV file (.csv extension)"
+                "File must be a CSV file (.csv extension) or JSON file (.json extension)"
             )
 
         if hasattr(value, "content_type"):
             content_type = value.content_type
-            if content_type not in [
+            csv_content_types = [
                 "text/csv",
                 "application/csv",
                 "text/plain",
                 "application/vnd.ms-excel",
-            ]:
+            ]
+            json_content_types = [
+                "application/json",
+                "text/json",
+            ]
+
+            if content_type not in csv_content_types + json_content_types:
                 raise serializers.ValidationError(
-                    f"Invalid file type: {content_type}. Expected CSV file."
+                    f"Invalid file type: {content_type}. Expected CSV or JSON file."
                 )
 
         return value

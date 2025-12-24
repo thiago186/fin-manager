@@ -11,20 +11,22 @@ from rest_framework.views import APIView
 from apps.accounts.models.imported_report import ImportedReport
 from apps.accounts.serializers.csv_import import CSVImportSerializer
 from apps.accounts.services.file_storage_service import get_file_storage_service
-from apps.accounts.tasks import process_csv_import_task
+from apps.accounts.tasks import process_import_task  # type: ignore
 
 
 class CSVImportView(APIView):
-    """API view for importing transactions from CSV files."""
+    """API view for importing transactions from CSV or JSON files."""
 
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FileUploadParser]
 
     @extend_schema(
         tags=["transactions"],
-        summary="Import transactions from CSV",
+        summary="Import transactions from CSV or JSON",
         description=(
-            "Import transactions from a CSV file asynchronously. The CSV format is auto-detected based on column headers. "
+            "Import transactions from a CSV or JSON file asynchronously. "
+            "For CSV files, the format is auto-detected based on column headers. "
+            "For JSON files, the format should be an array of transaction objects with fields: name, date, total, and optionally current_installment, total_installments. "
             "Categories and subcategories are matched by name and created if they don't exist. "
             "Accounts and credit cards are matched by name or ID (must exist). "
             "Tags are matched by name and created if they don't exist. "
@@ -38,7 +40,7 @@ class CSVImportView(APIView):
                     "file": {
                         "type": "string",
                         "format": "binary",
-                        "description": "CSV file containing transactions",
+                        "description": "CSV or JSON file containing transactions",
                     },
                     "account_id": {
                         "type": "integer",
@@ -77,43 +79,45 @@ class CSVImportView(APIView):
         ],
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """Handle CSV file upload and trigger async import.
+        """Handle CSV or JSON file upload and trigger async import.
 
         Args:
-            request: The HTTP request containing the CSV file.
+            request: The HTTP request containing the CSV or JSON file.
             *args: Additional arguments.
             **kwargs: Additional keyword arguments.
 
         Returns:
             Response with report_id and status endpoint (202 Accepted).
         """
-        serializer = CSVImportSerializer(data=request.data, context={"request": request})
+        serializer = CSVImportSerializer(
+            data=request.data, context={"request": request}
+        )
 
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        csv_file = serializer.validated_data["file"]
+        file = serializer.validated_data["file"]
         account_id = serializer.validated_data.get("account_id")
         credit_card_id = serializer.validated_data.get("credit_card_id")
 
         try:
             storage_service = get_file_storage_service()
             file_path = storage_service.save_file(
-                csv_file,
-                csv_file.name,
+                file,
+                file.name,
                 request.user.id,  # type: ignore
             )
 
             imported_report = ImportedReport.objects.create(
                 user=request.user,
                 status=ImportedReport.Status.SENT,
-                file_name=csv_file.name,
+                file_name=file.name,
                 file_path=file_path,
                 account_id=account_id,
                 credit_card_id=credit_card_id,
             )
 
-            process_csv_import_task.delay(imported_report.id)
+            process_import_task.delay(imported_report.id)
 
             return Response(
                 {
@@ -125,6 +129,6 @@ class CSVImportView(APIView):
             )
         except Exception as e:
             return Response(
-                {"error": f"Error processing CSV file upload: {str(e)}"},
+                {"error": f"Error processing file upload: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
