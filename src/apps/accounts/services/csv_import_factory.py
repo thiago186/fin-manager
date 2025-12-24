@@ -1,10 +1,10 @@
-import os
 import structlog
 from typing import Type
 
-import pandas as pd
-
 from apps.accounts.interfaces.csv_handler import BaseCSVHandler
+from apps.accounts.transactions_handlers.banco_inter_bank_statement_csv_handler import (
+    BancoInterBankStatementCsvHandler,
+)
 from apps.accounts.transactions_handlers.banco_inter_credit_card_csv_handler import (
     BancoInterCreditCardCsvHandler,
 )
@@ -18,6 +18,7 @@ class CSVImportFactory:
 
     # Registry of format handlers (order matters - more specific handlers first)
     _handlers: list[Type[BaseCSVHandler]] = [
+        BancoInterBankStatementCsvHandler,
         BancoInterCreditCardCsvHandler,
         DefaultCSVHandler,
     ]
@@ -25,6 +26,10 @@ class CSVImportFactory:
     @classmethod
     def create_handler(cls, csv_file_path: str) -> BaseCSVHandler:
         """Create appropriate CSV handler based on format detection.
+
+        Iterates through registered handlers in order and returns the first one
+        that can handle the file. Handlers are responsible for their own
+        detection logic.
 
         Args:
             csv_file_path: Path to the CSV file.
@@ -35,59 +40,33 @@ class CSVImportFactory:
         Raises:
             ValueError: If no suitable handler can be determined.
         """
-        headers = cls._read_csv_headers(csv_file_path)
-
         for handler_class in cls._handlers:
             handler_instance = handler_class()
-            if handler_instance.can_handle_file(headers):
-                logger.debug(f"Using handler: {handler_class.__name__}")
-                return handler_instance
-            else:
+            try:
+                if handler_instance.can_handle_file(csv_file_path):
+                    logger.debug(
+                        "Using handler",
+                        handler_type=handler_class.__name__,
+                        file_path=csv_file_path,
+                    )
+                    return handler_instance
+                else:
+                    logger.debug(
+                        "Handler cannot handle file",
+                        handler_type=handler_class.__name__,
+                        file_path=csv_file_path,
+                    )
+            except Exception as e:
                 logger.debug(
-                    f"Handler {handler_class.__name__} cannot handle file",
-                    headers=headers,
+                    "Handler raised error during detection",
+                    handler_type=handler_class.__name__,
+                    file_path=csv_file_path,
+                    error=str(e),
                 )
+                continue
 
+        logger.warning(
+            "No handler could process file, using default handler",
+            file_path=csv_file_path,
+        )
         return DefaultCSVHandler()
-
-    @classmethod
-    def _read_csv_headers(cls, csv_file_path: str) -> list[str]:
-        """Read CSV headers from file using pandas.
-
-        Pandas automatically handles BOM, encoding, and CSV parsing.
-
-        Args:
-            csv_file_path: Path to the CSV file.
-
-        Returns:
-            List of header column names (normalized to lowercase).
-
-        Raises:
-            ValueError: If file cannot be read or is not a valid CSV.
-        """
-        try:
-            logger.debug(
-                "Reading CSV file",
-                path=csv_file_path,
-                exists=os.path.exists(csv_file_path),
-                size=os.path.getsize(csv_file_path)
-                if os.path.exists(csv_file_path)
-                else 0,
-            )
-            # Read only the first row to get headers
-            # utf-8-sig automatically handles BOM
-            df = pd.read_csv(
-                csv_file_path,
-                encoding="utf-8-sig",
-                nrows=0,  # Only read headers, not data
-            )
-            if df.columns.empty:
-                raise ValueError("CSV file is empty or has no headers")
-            # Normalize headers: strip whitespace and convert to lowercase
-            return [str(col).strip().lower() for col in df.columns]
-        except FileNotFoundError:
-            raise FileNotFoundError(f"File '{csv_file_path}' not found.")
-        except pd.errors.EmptyDataError:
-            raise ValueError("CSV file is empty")
-        except Exception as e:
-            raise ValueError(f"Error reading CSV file '{csv_file_path}': {e}")

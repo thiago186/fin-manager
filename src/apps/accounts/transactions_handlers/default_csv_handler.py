@@ -35,19 +35,45 @@ class DefaultCSVHandler(BaseCSVHandler):
         "%m-%d-%Y",
     ]
 
-    def can_handle_file(self, csv_headers: list[str]) -> bool:
-        """Check if this handler can handle the CSV file based on its headers.
+    def can_handle_file(self, csv_file_path: str) -> bool:
+        """Check if this handler can handle the CSV file.
+
+        Reads the file with standard CSV reading and checks if it contains at
+        least one date column and one amount column (required fields). This is
+        the fallback handler, so it should return True if it can read the file
+        and find the required columns.
 
         Args:
-            csv_headers: List of CSV column headers (normalized to lowercase).
+            csv_file_path: Path to the CSV file to check.
 
         Returns:
             True if this handler can handle the CSV format, False otherwise.
+            Returns False if the file cannot be read or doesn't have required columns.
         """
-        # Check for at least one date column and one amount column (required fields)
-        has_date = any(col in csv_headers for col in self.DATE_COLUMNS)
-        has_amount = any(col in csv_headers for col in self.AMOUNT_COLUMNS)
-        return has_date and has_amount
+        try:
+            with open(csv_file_path, "r", encoding="utf-8") as file:
+                reader = csv.DictReader(file)
+                # Get headers from the reader
+                headers = reader.fieldnames
+
+                if not headers:
+                    return False
+
+                # Normalize headers (case-insensitive, strip whitespace)
+                normalized_headers = [h.strip().lower() if h else "" for h in headers]
+
+                # Check for at least one date column and one amount column (required fields)
+                has_date = any(col in normalized_headers for col in self.DATE_COLUMNS)
+                has_amount = any(
+                    col in normalized_headers for col in self.AMOUNT_COLUMNS
+                )
+
+                return has_date and has_amount
+        except (FileNotFoundError, UnicodeDecodeError, csv.Error):
+            return False
+        except Exception:
+            # Any other error means we can't handle this file
+            return False
 
     def parse_transactions_from_file(
         self, filename: str, user: User
@@ -242,7 +268,9 @@ class DefaultCSVHandler(BaseCSVHandler):
                 continue
         return None
 
-    def _parse_transaction_type(self, type_str: str, row_num: int) -> str:
+    def _parse_transaction_type(
+        self, type_str: str, row_num: int
+    ) -> Transaction.TransactionType:
         """Parse transaction type string.
 
         Args:

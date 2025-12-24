@@ -28,13 +28,19 @@ class BaseCSVHandler(ABC):
         pass
 
     @abstractmethod
-    def can_handle_file(self, csv_headers: list[str]) -> bool:
-        """Check if this handler can handle the CSV file based on its headers.
+    def can_handle_file(self, csv_file_path: str) -> bool:
+        """Check if this handler can handle the CSV file.
+
+        Each handler is responsible for reading the file and determining if it
+        can handle the format. This allows handlers to use their own detection
+        strategies (e.g., reading specific lines, checking metadata, etc.).
 
         Args:
-            csv_headers: List of CSV column headers (normalized to lowercase).
+            csv_file_path: Path to the CSV file to check.
 
         Returns:
             True if this handler can handle the CSV format, False otherwise.
+            Should return False (not raise) if the file cannot be read or
+            doesn't match the expected format.
         """
         raise NotImplementedError("Subclasses must implement can_handle_file method")

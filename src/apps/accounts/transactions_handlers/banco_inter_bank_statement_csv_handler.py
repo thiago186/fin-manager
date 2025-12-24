@@ -9,18 +9,18 @@ from apps.accounts.interfaces.csv_handler import BaseCSVHandler
 from apps.accounts.models.transaction import Transaction
 
 
-class BancoInterCreditCardCsvHandler(BaseCSVHandler):
-    """Handler for parsing transactions from Banco Inter credit card CSV files."""
+class BancoInterBankStatementCsvHandler(BaseCSVHandler):
+    """Handler for parsing transactions from Banco Inter bank statement CSV files."""
 
-    # Expected headers for Banco Inter CSV format
-    EXPECTED_HEADERS = ["data", "lançamento", "categoria", "tipo", "valor"]
+    # Expected headers for Banco Inter bank statement CSV format
+    EXPECTED_HEADERS = ["data lançamento", "descrição", "valor", "saldo"]
 
     def can_handle_file(self, csv_file_path: str) -> bool:
         """Check if this handler can handle the CSV file.
 
-        Reads the file with standard pandas CSV reading (no skiprows, comma
-        delimiter) and checks if headers match the expected Banco Inter credit
-        card CSV format.
+        Reads the file with skiprows=5 (to skip metadata lines) and semicolon
+        delimiter, then checks if headers match the expected Banco Inter bank
+        statement format.
 
         Args:
             csv_file_path: Path to the CSV file to check.
@@ -30,11 +30,15 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
             Returns False if the file cannot be read or doesn't match the format.
         """
         try:
-            # Read CSV file with standard settings
+            # Read CSV file skipping the first 5 metadata lines
+            # Using skiprows=5 to skip lines 0-4 (0-indexed), so header is at row 5
             df = pd.read_csv(
                 csv_file_path,
                 encoding="utf-8-sig",
+                sep=";",
+                skiprows=5,
                 nrows=0,  # Only read headers, not data
+                skipinitialspace=True,
             )
 
             if df.columns.empty:
@@ -59,7 +63,10 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
     def parse_transactions_from_file(
         self, filename: str, user: User
     ) -> list[Transaction]:
-        """Parse transactions from Banco Inter CSV file.
+        """Parse transactions from Banco Inter bank statement CSV file.
+
+        The CSV file has metadata lines at the top (lines 1-5) that need to be skipped.
+        The header row is at line 6, and data rows start at line 7.
 
         Args:
             filename: Path to the CSV file containing transaction data.
@@ -73,16 +80,26 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
             ValueError: If required fields are missing or invalid.
         """
         try:
-            df = pd.read_csv(filename, encoding="utf-8-sig")
+            # Read CSV file skipping the first 5 metadata lines
+            # Using skiprows=5 to skip lines 0-4 (0-indexed), so header is at row 5
+            df = pd.read_csv(
+                filename,
+                encoding="utf-8-sig",
+                sep=";",
+                skiprows=5,
+                skipinitialspace=True,
+            )
 
             if df.empty:
                 return []
 
+            # Normalize column names
             df.columns = df.columns.str.strip().str.lower()
 
             transactions = []
             for row_idx, (_, row) in enumerate(df.iterrows(), start=0):
-                row_num = row_idx + 2
+                # Row number for error reporting (accounting for skipped rows + header)
+                row_num = row_idx + 7
                 try:
                     row_dict: dict[str, str] = {
                         str(k): str(v) if pd.notna(v) else "" for k, v in row.items()
@@ -117,9 +134,9 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
         Raises:
             ValueError: If required fields are missing or invalid.
         """
-        date_str = row.get("data", "").strip()
+        date_str = row.get("data lançamento", "").strip()
         if not date_str:
-            raise ValueError(f"Row {row_num}: Missing required field: data")
+            raise ValueError(f"Row {row_num}: Missing required field: data lançamento")
 
         occurred_at = self._parse_date(date_str, row_num)
         if not occurred_at:
@@ -131,13 +148,15 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
 
         amount = self._parse_amount(valor_str, row_num)
 
+        # In bank statements: negative values are expenses (money going out),
+        # positive values are income (money coming in)
         if amount < 0:
-            transaction_type = Transaction.TransactionType.INCOME
+            transaction_type = Transaction.TransactionType.EXPENSE
             amount = abs(amount)
         else:
-            transaction_type = Transaction.TransactionType.EXPENSE
+            transaction_type = Transaction.TransactionType.INCOME
 
-        description = row.get("lançamento", "").strip() or ""
+        description = row.get("descrição", "").strip() or ""
 
         transaction = Transaction(
             user=user,
@@ -168,9 +187,10 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
         """Parse amount string in Brazilian Real format.
 
         Handles formats like:
-        - "R$ 384,72" (positive)
-        - "-R$ 13,94" (negative)
-        - "R$ 1.468,78" (with thousands separator)
+        - "1,00" (positive)
+        - "-5,00" (negative)
+        - "5.000,00" (with thousands separator)
+        - "-10.000,00" (negative with thousands separator)
 
         Args:
             valor_str: Amount string to parse.
@@ -182,12 +202,13 @@ class BancoInterCreditCardCsvHandler(BaseCSVHandler):
         Raises:
             ValueError: If amount format is invalid.
         """
-        valor_str = valor_str.replace("R$", "").strip()
+        valor_str = valor_str.strip()
 
         is_negative = valor_str.startswith("-")
         if is_negative:
             valor_str = valor_str[1:].strip()
 
+        # Remove thousands separator (dot) and replace decimal separator (comma) with dot
         valor_str = valor_str.replace(".", "").replace(",", ".")
 
         try:
