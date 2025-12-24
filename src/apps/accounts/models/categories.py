@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
+
 from django.contrib.auth.models import User
 from django.db import models
+
+if TYPE_CHECKING:
+    from apps.accounts.models.subcategory import Subcategory
 
 
 class Category(models.Model):
@@ -52,6 +57,7 @@ class Category(models.Model):
 
     # Type hints
     id: int
+    subcategories: models.Manager["Subcategory"]
 
     class Meta:
         """Meta options for the Category model."""

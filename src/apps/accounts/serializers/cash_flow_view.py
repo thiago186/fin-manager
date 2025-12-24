@@ -217,13 +217,6 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
         return instance
 
 
-class CategorySummarySerializer(serializers.Serializer):
-    """Serializer for category summary in report."""
-
-    id = serializers.IntegerField()
-    name = serializers.CharField()
-
-
 class MonthlyTotalsSerializer(serializers.Serializer):
     """Serializer for monthly totals in report."""
 
@@ -232,13 +225,32 @@ class MonthlyTotalsSerializer(serializers.Serializer):
         return {str(k): str(v) for k, v in instance.items()}
 
 
+class SubcategoryReportItemSerializer(serializers.Serializer):
+    """Serializer for subcategory items in report."""
+
+    id = serializers.IntegerField(allow_null=True)
+    name = serializers.CharField()
+    monthly_totals = MonthlyTotalsSerializer()
+    annual_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class CategoryReportItemSerializer(serializers.Serializer):
+    """Serializer for category items in report with nested subcategories."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    monthly_totals = MonthlyTotalsSerializer()
+    annual_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    subcategories = SubcategoryReportItemSerializer(many=True)
+
+
 class GroupReportItemSerializer(serializers.Serializer):
     """Serializer for group items in report."""
 
     type = serializers.CharField(default="group")
     name = serializers.CharField()
     position = serializers.IntegerField()
-    categories = CategorySummarySerializer(many=True)
+    categories = CategoryReportItemSerializer(many=True)
     monthly_totals = MonthlyTotalsSerializer()
     annual_total = serializers.DecimalField(max_digits=12, decimal_places=2)
 

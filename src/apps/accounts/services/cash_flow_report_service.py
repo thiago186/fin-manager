@@ -13,6 +13,7 @@ from apps.accounts.models.cash_flow_view import (
     CashFlowView,
 )
 from apps.accounts.models.categories import Category
+from apps.accounts.models.subcategory import Subcategory
 from apps.accounts.models.transaction import Transaction
 
 logger = structlog.stdlib.get_logger()
@@ -73,9 +74,7 @@ class CashFlowReportService:
             annual_total = sum(monthly_totals.values())
             group_totals[group.position] = monthly_totals
 
-            categories = [
-                {"id": cat.id, "name": cat.name} for cat in group.categories.all()
-            ]
+            categories_data = self._build_categories_with_subcategories(group, year)
 
             logger.debug(
                 "Group totals calculated",
@@ -83,7 +82,7 @@ class CashFlowReportService:
                 group_id=group.id,
                 group_name=group.name,
                 annual_total=str(annual_total),
-                categories_count=len(categories),
+                categories_count=len(categories_data),
             )
 
             items.append(
@@ -91,7 +90,7 @@ class CashFlowReportService:
                     "type": "group",
                     "name": group.name,
                     "position": group.position,
-                    "categories": categories,
+                    "categories": categories_data,
                     "monthly_totals": {
                         str(month): str(total)
                         for month, total in monthly_totals.items()
@@ -236,6 +235,290 @@ class CashFlowReportService:
             months_with_data=months_with_data,
             months_with_data_count=len(months_with_data),
         )
+
+        return monthly_totals
+
+    def _build_categories_with_subcategories(
+        self, group: CashFlowGroup, year: int
+    ) -> list[dict[str, Any]]:
+        """Build categories with nested subcategories for a group.
+
+        Args:
+            group: The CashFlowGroup to build categories for.
+            year: The year to calculate totals for.
+
+        Returns:
+            List of category dictionaries with nested subcategories.
+        """
+        categories_data = []
+        group_categories = group.categories.all().order_by("name")
+
+        for category in group_categories:
+            logger.debug(
+                "Processing category",
+                group_id=group.id,
+                category_id=category.id,
+                category_name=category.name,
+                year=year,
+            )
+
+            category_monthly_totals = self._calculate_category_monthly_totals(
+                category, year
+            )
+            category_annual_total = sum(category_monthly_totals.values())
+
+            subcategories_data = self._build_subcategories_for_category(category, year)
+
+            categories_data.append(
+                {
+                    "id": category.id,
+                    "name": category.name,
+                    "monthly_totals": {
+                        str(month): str(total)
+                        for month, total in category_monthly_totals.items()
+                    },
+                    "annual_total": str(category_annual_total),
+                    "subcategories": subcategories_data,
+                }
+            )
+
+        return categories_data
+
+    def _build_subcategories_for_category(
+        self, category: Category, year: int
+    ) -> list[dict[str, Any]]:
+        """Build subcategories list for a category, including uncategorized transactions.
+
+        Args:
+            category: The Category to build subcategories for.
+            year: The year to calculate totals for.
+
+        Returns:
+            List of subcategory dictionaries, including an "Uncategorized" entry if needed.
+        """
+        subcategories_data = []
+
+        category_subcategories = category.subcategories.filter(  # type: ignore[attr-defined]
+            is_active=True, user=self.user
+        ).order_by("name")
+
+        for subcategory in category_subcategories:
+            logger.debug(
+                "Processing subcategory",
+                category_id=category.id,
+                subcategory_id=subcategory.id,
+                subcategory_name=subcategory.name,
+                year=year,
+            )
+
+            subcategory_monthly_totals = self._calculate_subcategory_monthly_totals(
+                subcategory, year
+            )
+            subcategory_annual_total = sum(subcategory_monthly_totals.values())
+
+            if subcategory_annual_total != Decimal("0.00"):
+                subcategories_data.append(
+                    {
+                        "id": subcategory.id,
+                        "name": subcategory.name,
+                        "monthly_totals": {
+                            str(month): str(total)
+                            for month, total in subcategory_monthly_totals.items()
+                        },
+                        "annual_total": str(subcategory_annual_total),
+                    }
+                )
+
+        uncategorized_totals = self._calculate_uncategorized_monthly_totals(
+            category, year
+        )
+        uncategorized_annual_total = sum(uncategorized_totals.values())
+
+        if uncategorized_annual_total != Decimal("0.00"):
+            subcategories_data.append(
+                {
+                    "id": None,
+                    "name": "Uncategorized",
+                    "monthly_totals": {
+                        str(month): str(total)
+                        for month, total in uncategorized_totals.items()
+                    },
+                    "annual_total": str(uncategorized_annual_total),
+                }
+            )
+
+        return subcategories_data
+
+    def _calculate_category_monthly_totals(
+        self, category: Category, year: int
+    ) -> dict[int, Decimal]:
+        """Calculate monthly totals for a category.
+
+        Args:
+            category: The Category to calculate totals for.
+            year: The year to calculate totals for.
+
+        Returns:
+            Dictionary mapping month number (1-12) to total amount for that month.
+        """
+        logger.debug(
+            "Calculating category monthly totals",
+            category_id=category.id,
+            category_name=category.name,
+            year=year,
+        )
+
+        transactions = Transaction.objects.filter(
+            user=self.user,
+            category=category,
+            occurred_at__year=year,
+        )
+
+        monthly_data = (
+            transactions.annotate(month=TruncMonth("occurred_at"))
+            .values("month")
+            .annotate(
+                total=Sum(
+                    Case(
+                        When(
+                            category__transaction_type=Category.TransactionType.INCOME,
+                            then="amount",
+                        ),
+                        When(
+                            category__transaction_type=Category.TransactionType.EXPENSE,
+                            then=-1 * F("amount"),
+                        ),
+                        default=Decimal("0.00"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                )
+            )
+            .order_by("month")
+        )
+
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
+
+        for entry in monthly_data:
+            month = entry["month"].month
+            monthly_totals[month] = entry["total"]
+
+        return monthly_totals
+
+    def _calculate_subcategory_monthly_totals(
+        self, subcategory: Subcategory, year: int
+    ) -> dict[int, Decimal]:
+        """Calculate monthly totals for a subcategory.
+
+        Args:
+            subcategory: The Subcategory to calculate totals for.
+            year: The year to calculate totals for.
+
+        Returns:
+            Dictionary mapping month number (1-12) to total amount for that month.
+        """
+        logger.debug(
+            "Calculating subcategory monthly totals",
+            subcategory_id=subcategory.id,
+            subcategory_name=subcategory.name,
+            category_id=subcategory.category.id,
+            year=year,
+        )
+
+        transactions = Transaction.objects.filter(
+            user=self.user,
+            subcategory=subcategory,
+            occurred_at__year=year,
+        )
+
+        monthly_data = (
+            transactions.annotate(month=TruncMonth("occurred_at"))
+            .values("month")
+            .annotate(
+                total=Sum(
+                    Case(
+                        When(
+                            category__transaction_type=Category.TransactionType.INCOME,
+                            then="amount",
+                        ),
+                        When(
+                            category__transaction_type=Category.TransactionType.EXPENSE,
+                            then=-1 * F("amount"),
+                        ),
+                        default=Decimal("0.00"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                )
+            )
+            .order_by("month")
+        )
+
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
+
+        for entry in monthly_data:
+            month = entry["month"].month
+            monthly_totals[month] = entry["total"]
+
+        return monthly_totals
+
+    def _calculate_uncategorized_monthly_totals(
+        self, category: Category, year: int
+    ) -> dict[int, Decimal]:
+        """Calculate monthly totals for transactions without subcategories in a category.
+
+        Args:
+            category: The Category to calculate uncategorized totals for.
+            year: The year to calculate totals for.
+
+        Returns:
+            Dictionary mapping month number (1-12) to total amount for that month.
+        """
+        logger.debug(
+            "Calculating uncategorized monthly totals",
+            category_id=category.id,
+            category_name=category.name,
+            year=year,
+        )
+
+        transactions = Transaction.objects.filter(
+            user=self.user,
+            category=category,
+            subcategory__isnull=True,
+            occurred_at__year=year,
+        )
+
+        monthly_data = (
+            transactions.annotate(month=TruncMonth("occurred_at"))
+            .values("month")
+            .annotate(
+                total=Sum(
+                    Case(
+                        When(
+                            category__transaction_type=Category.TransactionType.INCOME,
+                            then="amount",
+                        ),
+                        When(
+                            category__transaction_type=Category.TransactionType.EXPENSE,
+                            then=-1 * F("amount"),
+                        ),
+                        default=Decimal("0.00"),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                )
+            )
+            .order_by("month")
+        )
+
+        monthly_totals: dict[int, Decimal] = {
+            month: Decimal("0.00") for month in range(1, 13)
+        }
+
+        for entry in monthly_data:
+            month = entry["month"].month
+            monthly_totals[month] = entry["total"]
 
         return monthly_totals
 
