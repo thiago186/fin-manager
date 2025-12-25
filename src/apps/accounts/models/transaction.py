@@ -84,6 +84,12 @@ class Transaction(models.Model):
         auto_now=True, help_text="The date and time the transaction was last updated"
     )
 
+    # AI classification flag
+    need_review = models.BooleanField(
+        default=False,
+        help_text="Whether this transaction needs review after AI classification"
+    )
+
     # Type hints
     id: int
 

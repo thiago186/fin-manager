@@ -405,3 +405,29 @@ class TransactionViewSet(ModelViewSet):
 
         response_serializer = TransactionSerializer(updated_transactions, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=["transactions"],
+        summary="List transactions needing review",
+        description=(
+            "Retrieve all transactions that need review after AI classification. "
+            "Only returns transactions belonging to the authenticated user."
+        ),
+        responses={200: TransactionSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="needing-review")
+    def needing_review(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Retrieve all transactions that need review.
+
+        Args:
+            request: The HTTP request
+            *args: Additional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Response with list of transactions needing review
+        """
+        queryset = self.get_queryset().filter(need_review=True)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

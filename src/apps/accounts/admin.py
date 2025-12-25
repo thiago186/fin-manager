@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any
 
 from django.contrib import admin
@@ -17,6 +18,7 @@ from apps.accounts.models import (
     Transaction,
 )
 from apps.accounts.tasks import process_csv_import_task
+from apps.ai.services.ai_classification_service import AIClassificationService
 
 
 @admin.register(Account)
@@ -277,6 +279,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "category",
         "installments_total",
         "installment_number",
+        "need_review",
     ]
     list_filter = [
         "transaction_type",
@@ -284,6 +287,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "category",
         "subcategory",
         "installments_total",
+        "need_review",
     ]
     search_fields = [
         "description",
@@ -300,6 +304,7 @@ class TransactionAdmin(admin.ModelAdmin):
     list_editable = [
         "transaction_type",
         "amount",
+        "need_review",
     ]
     ordering = [
         "-occurred_at",
@@ -315,6 +320,9 @@ class TransactionAdmin(admin.ModelAdmin):
         "tags",
     ]
     date_hierarchy = "occurred_at"
+    actions = [
+        "classify_with_ai",
+    ]
 
     fieldsets = (
         (
@@ -351,6 +359,13 @@ class TransactionAdmin(admin.ModelAdmin):
                 "description": "For installment transactions, set total and current number.",
             },
         ),
+        (
+            "AI Classification",
+            {
+                "fields": ("need_review",),
+                "description": "Flag indicating if this transaction needs review after AI classification.",
+            },
+        ),
     )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Transaction]:
@@ -367,6 +382,83 @@ class TransactionAdmin(admin.ModelAdmin):
             )
             .prefetch_related("tags")
         )
+
+    @admin.action(description="Classify selected transactions with AI")
+    def classify_with_ai(
+        self, request: HttpRequest, queryset: QuerySet[Transaction]
+    ) -> None:
+        """Admin action to classify selected transactions using AI.
+
+        This action groups transactions by user and classifies them using the
+        AI classification service. Only uncategorized transactions will be processed.
+
+        Args:
+            request: HTTP request object.
+            queryset: QuerySet of Transaction instances to classify.
+        """
+        # Filter to only uncategorized transactions
+        uncategorized = queryset.filter(subcategory__isnull=True)
+
+        if not uncategorized.exists():
+            self.message_user(
+                request,
+                "No uncategorized transactions selected. All selected transactions already have subcategories.",
+                level="warning",
+            )
+            return
+
+        # Group by user
+        transactions_by_user: dict[int, list[Transaction]] = defaultdict(list)
+
+        for transaction in uncategorized.select_related("user"):
+            transactions_by_user[transaction.user.id].append(transaction)
+
+        total_classified = 0
+        total_failed = 0
+        total_processed = 0
+        errors: list[str] = []
+
+        for user_id, user_transactions in transactions_by_user.items():
+            user = user_transactions[0].user
+            try:
+                service = AIClassificationService(user=user)
+                result = service.classify_specific_transactions(user_transactions)
+
+                total_classified += result["classified_count"]
+                total_failed += result["failed_count"]
+                total_processed += result["total_processed"]
+                errors.extend(result["errors"])
+
+            except Exception as e:
+                total_failed += len(user_transactions)
+                total_processed += len(user_transactions)
+                errors.append(
+                    f"Error classifying transactions for user {user.username}: {str(e)}"
+                )
+
+        # Build success message
+        message_parts = [
+            f"Processed {total_processed} transaction{'s' if total_processed != 1 else ''}.",
+        ]
+
+        if total_classified > 0:
+            message_parts.append(
+                f"Successfully classified {total_classified} transaction{'s' if total_classified != 1 else ''}."
+            )
+
+        if total_failed > 0:
+            message_parts.append(
+                f"Failed to classify {total_failed} transaction{'s' if total_failed != 1 else ''}."
+            )
+
+        if errors:
+            error_summary = "; ".join(errors[:5])
+            if len(errors) > 5:
+                error_summary += f" (and {len(errors) - 5} more errors)"
+            message_parts.append(f"Errors: {error_summary}")
+
+        level = "success" if total_classified > 0 else "warning"
+        self.message_user(request, " ".join(message_parts), level=level)
 
 
 @admin.register(ImportedReport)

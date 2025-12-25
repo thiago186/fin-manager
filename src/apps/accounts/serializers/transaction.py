@@ -89,6 +89,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "subcategory_id",
             "tags",
             "tag_ids",
+            "need_review",
         ]
         read_only_fields = ["user", "created_at", "updated_at", "installment_group_id"]
 
