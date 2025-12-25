@@ -7,8 +7,10 @@ Transactions are filtered by the authenticated user and can be filtered by trans
 
 from typing import Any
 
+import structlog
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import models, transaction as db_transaction
+from django.db import models
+from django.db import transaction as db_transaction
 from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import serializers, status
@@ -22,8 +24,9 @@ from apps.accounts.models.transaction import Transaction
 from apps.accounts.serializers import TransactionSerializer
 from apps.accounts.serializers.transaction import (
     BulkTransactionUpdateRequestSerializer,
-    BulkTransactionUpdateSerializer,
 )
+
+logger = structlog.stdlib.get_logger()
 
 
 class TransactionViewSet(ModelViewSet):
@@ -276,11 +279,13 @@ class TransactionViewSet(ModelViewSet):
                             "id": 1,
                             "category_id": 5,
                             "description": "Updated description",
+                            "need_review": False,
                         },
                         {
                             "id": 2,
                             "amount": "150.00",
                             "subcategory_id": 10,
+                            "need_review": True,
                         },
                     ]
                 },
@@ -307,7 +312,10 @@ class TransactionViewSet(ModelViewSet):
                 request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
-        transaction_updates = request_serializer.validated_data["transactions"]
+        validated_data = request_serializer.validated_data
+        logger.debug(f"Validated data: {validated_data}")
+
+        transaction_updates = validated_data["transactions"]
         transaction_ids = [update["id"] for update in transaction_updates]
 
         user_transactions = Transaction.objects.filter(
@@ -356,8 +364,11 @@ class TransactionViewSet(ModelViewSet):
                         )
                         continue
 
-                    update_serializer = BulkTransactionUpdateSerializer(
-                        data=update_data, context={"request": request}
+                    update_serializer = TransactionSerializer(
+                        instance=transaction,
+                        data=update_data,
+                        partial=True,
+                        context={"request": request},
                     )
                     if not update_serializer.is_valid():
                         errors.append(
@@ -369,9 +380,7 @@ class TransactionViewSet(ModelViewSet):
                         continue
 
                     try:
-                        updated_transaction = update_serializer.update_transaction(
-                            transaction
-                        )
+                        updated_transaction = update_serializer.save()
                         updated_transactions.append(updated_transaction)
                     except DjangoValidationError as e:
                         errors.append(
