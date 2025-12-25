@@ -1,7 +1,4 @@
-# from fin_manager.celery import app as celery_app
+from fin_manager.celery import app as celery_app
 
-# __all__ = ["celery_app"]
-
-# Temporarily commented out for development without Celery
-__all__ = []
+__all__ = ["celery_app"]
 
