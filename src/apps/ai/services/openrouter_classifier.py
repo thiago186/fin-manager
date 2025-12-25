@@ -52,6 +52,7 @@ class OpenRouterClassifier(AIClassifierInterface):
                     messages=messages,
                     temperature=0.3,
                     response_format={"type": "json_object"},
+                    timeout_ms=30 * 100,
                 )
 
             content = response.choices[0].message.content

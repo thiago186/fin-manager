@@ -131,7 +131,7 @@ class DefaultCSVHandler(BaseCSVHandler):
             ValueError: If required fields are missing or invalid.
         """
         # Normalize column names (case-insensitive, strip whitespace)
-        normalized_row = {k.strip().lower(): v for k, v in row.items() if v}
+        normalized_row = {k.strip().lower(): v for k, v in row.items() if k and v}
 
         # Find and parse date
         date_value = self._find_column_value(normalized_row, self.DATE_COLUMNS)

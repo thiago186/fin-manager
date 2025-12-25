@@ -46,8 +46,9 @@ class AIClassificationService:
         """Classify uncategorized transactions for the user.
 
         Args:
-            transaction_type: Optional filter by transaction type (INCOME, EXPENSE, TRANSFER)
-            limit: Maximum number of transactions to classify in one batch
+            transaction_type: Optional filter by transaction type (INCOME, EXPENSE, TRANSFER).
+                If None, classifies expenses first, then incomes separately.
+            limit: Maximum number of transactions to classify in one batch per transaction type
 
         Returns:
             Dictionary with classification summary:
@@ -65,6 +66,37 @@ class AIClassificationService:
             limit=limit,
         )
 
+        # If transaction_type is provided, classify only that type
+        if transaction_type:
+            return self._classify_transactions_by_type(transaction_type, limit)
+
+        # If no transaction_type provided, classify expenses first, then incomes
+        expense_result = self._classify_transactions_by_type("EXPENSE", limit)
+        income_result = self._classify_transactions_by_type("INCOME", limit)
+
+        # Aggregate results
+        return {
+            "classified_count": expense_result["classified_count"]
+            + income_result["classified_count"],
+            "failed_count": expense_result["failed_count"]
+            + income_result["failed_count"],
+            "total_processed": expense_result["total_processed"]
+            + income_result["total_processed"],
+            "errors": expense_result["errors"] + income_result["errors"],
+        }
+
+    def _classify_transactions_by_type(
+        self, transaction_type: str, limit: int
+    ) -> dict[str, Any]:
+        """Classify uncategorized transactions for a specific transaction type.
+
+        Args:
+            transaction_type: Transaction type to classify (INCOME, EXPENSE, TRANSFER)
+            limit: Maximum number of transactions to classify in one batch
+
+        Returns:
+            Dictionary with classification summary
+        """
         # Get user instructions
         user_instructions = self._get_user_instructions()
 
@@ -74,7 +106,11 @@ class AIClassificationService:
         )
 
         if not uncategorized_transactions:
-            logger.info("No uncategorized transactions found", user_id=self.user.id)
+            logger.info(
+                "No uncategorized transactions found",
+                user_id=self.user.id,
+                transaction_type=transaction_type,
+            )
             return {
                 "classified_count": 0,
                 "failed_count": 0,
@@ -105,11 +141,18 @@ class AIClassificationService:
         # Call AI classifier
         try:
             ai_response = self.classifier.classify(messages)
+            logger.debug(
+                "AI response",
+                ai_response=ai_response,
+                transactions_count=len(uncategorized_transactions),
+                transaction_type=transaction_type,
+            )
             classifications = self._parse_ai_response(ai_response)
         except Exception as e:
             logger.exception(
                 "AI classification failed",
                 user_id=self.user.id,
+                transaction_type=transaction_type,
                 error=str(e),
                 error_type=type(e).__name__,
             )
@@ -117,7 +160,9 @@ class AIClassificationService:
                 "classified_count": 0,
                 "failed_count": len(uncategorized_transactions),
                 "total_processed": len(uncategorized_transactions),
-                "errors": [f"AI classification failed: {str(e)}"],
+                "errors": [
+                    f"AI classification failed for {transaction_type}: {str(e)}"
+                ],
             }
 
         return self._update_transactions(classifications, uncategorized_transactions)
@@ -387,7 +432,7 @@ class AIClassificationService:
                 if not transaction_id or not subcategory_id:
                     failed_count += 1
                     errors.append(
-                        f"Invalid classification: missing transaction_id or subcategory_id"
+                        "Invalid classification: missing transaction_id or subcategory_id"
                     )
                     continue
 
