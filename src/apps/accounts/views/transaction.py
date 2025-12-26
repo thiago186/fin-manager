@@ -398,9 +398,26 @@ class TransactionViewSet(ModelViewSet):
                         )
                         continue
 
+                    # Convert validated_data to use _id fields for the update serializer
+                    # The BulkTransactionUpdateItemSerializer converts category_id/subcategory_id
+                    # to category/subcategory objects, but TransactionSerializer expects _id fields
+                    serializer_data = {
+                        k: v for k, v in update_data.items() if k != "id"
+                    }
+                    if "category" in serializer_data:
+                        category = serializer_data.pop("category")
+                        serializer_data["category_id"] = (
+                            category.id if category is not None else None
+                        )
+                    if "subcategory" in serializer_data:
+                        subcategory = serializer_data.pop("subcategory")
+                        serializer_data["subcategory_id"] = (
+                            subcategory.id if subcategory is not None else None
+                        )
+
                     update_serializer = TransactionSerializer(
                         instance=transaction,
-                        data=update_data,
+                        data=serializer_data,
                         partial=True,
                         context={"request": request},
                     )
