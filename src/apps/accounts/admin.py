@@ -280,6 +280,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "installments_total",
         "installment_number",
         "need_review",
+        "origin",
     ]
     list_filter = [
         "transaction_type",
@@ -334,6 +335,7 @@ class TransactionAdmin(admin.ModelAdmin):
                     "amount",
                     "description",
                     "occurred_at",
+                    "origin",
                 )
             },
         ),
