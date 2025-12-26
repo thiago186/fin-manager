@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models.transaction import Transaction
+from apps.ai.models import AIClassifierInstruction
 
 
 class AIClassificationRequestSerializer(serializers.Serializer):
@@ -40,3 +41,11 @@ class AIClassificationResponseSerializer(serializers.Serializer):
         help_text="List of error messages (limited to first 10)",
     )
 
+
+class AIClassifierInstructionSerializer(serializers.ModelSerializer):
+    """Serializer for AI Classifier Instruction model."""
+
+    class Meta:
+        model = AIClassifierInstruction
+        fields = ["id", "instructions", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
