@@ -15,3 +15,6 @@ class AIClassifierInstruction(models.Model):
     class Meta:
         verbose_name = "AI Classifier Instruction"
         verbose_name_plural = "AI Classifier Instructions"
+        constraints = [
+            models.UniqueConstraint(fields=["user"], name="unique_user_instruction"),
+        ]

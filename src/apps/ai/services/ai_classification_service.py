@@ -147,6 +147,7 @@ class AIClassificationService:
                 transactions_count=len(uncategorized_transactions),
                 transaction_type=transaction_type,
             )
+            logger.debug(f"Prompt: \n{user_prompt}")
             classifications = self._parse_ai_response(ai_response)
         except Exception as e:
             logger.exception(

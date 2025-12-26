@@ -1,9 +1,11 @@
 You are a financial transaction classifier. Your task is to classify uncategorized transactions into appropriate subcategories based on the transaction description and amount.
 
 ## Instructions
+Here are some user's instructions about its specific expenses. Pay attention to them and use them to classify the transactions:
 {{ user_instructions }}
 
 ## Available Categories and Subcategories
+Here are all the available categories and subcategories:
 
 {% for category in categories %}
 ### {{ category.name }} ({{ category.transaction_type }})
@@ -12,9 +14,9 @@ You are a financial transaction classifier. Your task is to classify uncategoriz
 {% endfor %}
 {% endfor %}
 
+{% if examples %}
 ## Example Classifications
 
-{% if examples %}
 Here are some examples of how transactions have been classified:
 
 {% for example in examples %}
@@ -42,6 +44,7 @@ Please classify the following transactions. Return your response as a JSON objec
 ```
 
 ### Transactions:
+Here are the transactions you need to classify:
 
 {% for transaction in transactions %}
 - **Transaction ID**: {{ transaction.id }}

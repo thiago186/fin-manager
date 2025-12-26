@@ -4,8 +4,7 @@ from typing import Any
 
 from django.http import Http404
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status
-from rest_framework.exceptions import MethodNotAllowed
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -47,7 +46,6 @@ class AIClassifierInstructionViewSet(ModelViewSet):
         description="Retrieve the classifier instruction for the authenticated user (singleton)",
         responses={
             200: AIClassifierInstructionSerializer,
-            404: {"description": "Instruction not found"},
         },
     )
     def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -60,15 +58,31 @@ class AIClassifierInstructionViewSet(ModelViewSet):
             **kwargs: Additional keyword arguments
 
         Returns:
-            Response with classifier instruction details
+            Response with classifier instruction details or empty dict if not found
         """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Http404:
+            return Response({})
 
+    @extend_schema(
+        tags=["AI"],
+        summary="Create or update classifier instruction",
+        description="Create a new classifier instruction or update existing one for the authenticated user",
+        request=AIClassifierInstructionSerializer,
+        responses={
+            200: AIClassifierInstructionSerializer,
+            201: AIClassifierInstructionSerializer,
+        },
+    )
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
-        Create is not allowed. Use PUT or PATCH to create or update.
+        Create or update the user's classifier instruction.
+
+        If an instruction already exists for the user, it will be updated.
+        Otherwise, a new instruction will be created.
 
         Args:
             request: The HTTP request
@@ -76,9 +90,20 @@ class AIClassifierInstructionViewSet(ModelViewSet):
             **kwargs: Additional keyword arguments
 
         Returns:
-            Response indicating method not allowed
+            Response with created or updated classifier instruction
         """
-        raise MethodNotAllowed("POST", detail="Use PUT or PATCH to create or update the instruction")
+        instance = AIClassifierInstruction.objects.filter(user=request.user).first()
+
+        if instance:
+            serializer = self.get_serializer(instance, data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         tags=["AI"],
@@ -86,7 +111,6 @@ class AIClassifierInstructionViewSet(ModelViewSet):
         description="Retrieve the classifier instruction for the authenticated user",
         responses={
             200: AIClassifierInstructionSerializer,
-            404: {"description": "Instruction not found"},
         },
     )
     def retrieve(self, request: Request, *args: Any, **kwargs: Any) -> Response:
@@ -99,18 +123,24 @@ class AIClassifierInstructionViewSet(ModelViewSet):
             **kwargs: Additional keyword arguments
 
         Returns:
-            Response with classifier instruction details
+            Response with classifier instruction details or empty dict if not found
         """
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Http404:
+            return Response({})
 
     @extend_schema(
         tags=["AI"],
         summary="Create or update classifier instruction",
         description="Create a new classifier instruction or update existing one",
         request=AIClassifierInstructionSerializer,
-        responses={200: AIClassifierInstructionSerializer, 201: AIClassifierInstructionSerializer},
+        responses={
+            200: AIClassifierInstructionSerializer,
+            201: AIClassifierInstructionSerializer,
+        },
     )
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
@@ -141,7 +171,10 @@ class AIClassifierInstructionViewSet(ModelViewSet):
         summary="Partially update classifier instruction",
         description="Partially update the user's classifier instruction",
         request=AIClassifierInstructionSerializer,
-        responses={200: AIClassifierInstructionSerializer, 201: AIClassifierInstructionSerializer},
+        responses={
+            200: AIClassifierInstructionSerializer,
+            201: AIClassifierInstructionSerializer,
+        },
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
@@ -188,4 +221,3 @@ class AIClassifierInstructionViewSet(ModelViewSet):
         instance = self.get_object()
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
