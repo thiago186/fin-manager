@@ -147,72 +147,32 @@ class CashFlowViewSerializer(serializers.ModelSerializer):
     def update(
         self, instance: CashFlowView, validated_data: dict[str, Any]
     ) -> CashFlowView:
-        """Update a cash flow view with nested groups and results."""
-        groups_data = validated_data.pop("groups", None)
-        results_data = validated_data.pop("results", None)
+        """
+        Update a cash flow view with nested groups and results.
+
+        Completely replaces all existing groups and results with the provided data.
+        All existing groups and results are deleted before creating new ones.
+        """
+        groups_data = validated_data.pop("groups", [])
+        results_data = validated_data.pop("results", [])
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        if groups_data is not None:
-            existing_group_ids = {group.id for group in instance.groups.all()}
-            updated_group_ids = set()
+        instance.groups.all().delete()
+        instance.results.all().delete()
 
-            for group_data in groups_data:
-                group_id = group_data.get("id")
-                categories = group_data.pop("categories", [])
-                group_data.pop("id", None)
+        for group_data in groups_data:
+            categories = group_data.pop("categories", [])
+            group_data.pop("id", None)
+            group = CashFlowGroup.objects.create(cash_flow_view=instance, **group_data)
+            if categories:
+                group.categories.set(categories)
 
-                if group_id and group_id in existing_group_ids:
-                    group = CashFlowGroup.objects.get(
-                        id=group_id, cash_flow_view=instance
-                    )
-                    for attr, value in group_data.items():
-                        setattr(group, attr, value)
-                    group.save()
-                    if categories is not None:
-                        group.categories.set(categories)
-                    updated_group_ids.add(group_id)
-                else:
-                    group = CashFlowGroup.objects.create(
-                        cash_flow_view=instance, **group_data
-                    )
-                    if categories:
-                        group.categories.set(categories)
-                    updated_group_ids.add(group.id)
-
-            for group_id in existing_group_ids - updated_group_ids:
-                CashFlowGroup.objects.filter(
-                    id=group_id, cash_flow_view=instance
-                ).delete()
-
-        if results_data is not None:
-            existing_result_ids = {result.id for result in instance.results.all()}
-            updated_result_ids = set()
-
-            for result_data in results_data:
-                result_id = result_data.get("id")
-                result_data.pop("id", None)
-
-                if result_id and result_id in existing_result_ids:
-                    result = CashFlowResult.objects.get(
-                        id=result_id, cash_flow_view=instance
-                    )
-                    for attr, value in result_data.items():
-                        setattr(result, attr, value)
-                    result.save()
-                    updated_result_ids.add(result_id)
-                else:
-                    result = CashFlowResult.objects.create(
-                        cash_flow_view=instance, **result_data
-                    )
-                    updated_result_ids.add(result.id)
-
-            for result_id in existing_result_ids - updated_result_ids:
-                CashFlowResult.objects.filter(
-                    id=result_id, cash_flow_view=instance
-                ).delete()
+        for result_data in results_data:
+            result_data.pop("id", None)
+            CashFlowResult.objects.create(cash_flow_view=instance, **result_data)
 
         return instance
 

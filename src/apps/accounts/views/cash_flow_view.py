@@ -109,13 +109,20 @@ class CashFlowViewViewSet(ModelViewSet):
     @extend_schema(
         tags=["cash-flow-views"],
         summary="Update cash flow view",
-        description="Update an existing cash flow view (full replace)",
+        description=(
+            "Update an existing cash flow view (full replace). "
+            "The entire cashflow object is expected, including all groups and results. "
+            "All existing groups and results will be completely replaced with the provided data."
+        ),
         request=CashFlowViewSerializer,
         responses={200: CashFlowViewSerializer},
     )
     def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Update a cash flow view.
+
+        Completely replaces all existing groups and results with the provided data.
+        All existing groups and results are deleted before creating new ones.
 
         Args:
             request: The HTTP request
@@ -130,13 +137,21 @@ class CashFlowViewViewSet(ModelViewSet):
     @extend_schema(
         tags=["cash-flow-views"],
         summary="Partial update cash flow view",
-        description="Partially update an existing cash flow view",
+        description=(
+            "Partially update an existing cash flow view. "
+            "If groups or results are provided, they will completely replace all existing groups or results. "
+            "All existing groups/results are deleted before creating new ones from the provided data."
+        ),
         request=CashFlowViewSerializer,
         responses={200: CashFlowViewSerializer},
     )
     def partial_update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Partially update a cash flow view.
+
+        If groups or results are provided in the request, they will completely replace
+        all existing groups or results. All existing groups/results are deleted before
+        creating new ones from the provided data.
 
         Args:
             request: The HTTP request
