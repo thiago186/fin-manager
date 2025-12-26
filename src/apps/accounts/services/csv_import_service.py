@@ -483,6 +483,11 @@ class CSVImportService:
 
             with db_transaction.atomic():
                 for transaction_obj in processed_transactions:
+                    # Set origin from imported_report if available
+                    if imported_report:
+                        transaction_obj.origin = imported_report.file_name
+                    else:
+                        transaction_obj.origin = ""
                     transaction_obj.save()
 
                     # Set tags after saving (many-to-many relationships require saved object)

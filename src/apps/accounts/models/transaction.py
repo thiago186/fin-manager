@@ -87,11 +87,31 @@ class Transaction(models.Model):
     # AI classification flag
     need_review = models.BooleanField(
         default=False,
-        help_text="Whether this transaction needs review after AI classification"
+        help_text="Whether this transaction needs review after AI classification",
+    )
+
+    origin = models.CharField(
+        max_length=255,
+        default="",
+        blank=True,
+        help_text="Source of transaction creation (e.g., 'manual', report filename)",
     )
 
     # Type hints
     id: int
+
+    class Meta:
+        """Meta options for Transaction model."""
+
+        indexes = [
+            models.Index(fields=["user", "transaction_type"], name="txn_user_type_idx"),
+            models.Index(fields=["user", "account"], name="txn_user_account_idx"),
+            models.Index(fields=["user", "credit_card"], name="txn_user_card_idx"),
+            models.Index(fields=["user", "category"], name="txn_user_category_idx"),
+            models.Index(fields=["user", "occurred_at"], name="txn_user_date_idx"),
+            models.Index(fields=["user", "need_review"], name="txn_user_review_idx"),
+        ]
+        ordering = ["-occurred_at"]
 
     def clean(self) -> None:
         """Validate the transaction data."""

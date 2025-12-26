@@ -103,8 +103,15 @@ class TransactionSerializer(serializers.ModelSerializer):
             "tags",
             "tag_ids",
             "need_review",
+            "origin",
         ]
-        read_only_fields = ["user", "created_at", "updated_at", "installment_group_id"]
+        read_only_fields = [
+            "user",
+            "created_at",
+            "updated_at",
+            "installment_group_id",
+            "origin",
+        ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """Validate transaction data according to business rules."""
@@ -151,6 +158,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     def create(self, validated_data: dict[str, Any]) -> Transaction:
         """Create a new transaction with automatic user assignment."""
         validated_data["user"] = self.context["request"].user
+        validated_data["origin"] = "manual"
         return cast(Transaction, super().create(validated_data))
 
 

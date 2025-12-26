@@ -15,6 +15,7 @@ from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -29,6 +30,14 @@ from apps.accounts.serializers.transaction import (
 logger = structlog.stdlib.get_logger()
 
 
+class TransactionPagination(PageNumberPagination):
+    """Custom pagination for transaction list with default 100 and max 500."""
+
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 500
+
+
 class TransactionViewSet(ModelViewSet):
     """
     ViewSet for managing transactions with CRUD operations.
@@ -39,15 +48,23 @@ class TransactionViewSet(ModelViewSet):
 
     permission_classes = [IsAuthenticated]
     serializer_class = TransactionSerializer
+    pagination_class = TransactionPagination
 
     def get_queryset(self) -> QuerySet[Transaction]:  # type: ignore
         """
-        Get queryset filtered by the authenticated user.
+        Get queryset filtered by the authenticated user with optimized queries.
+
+        Uses select_related for ForeignKey relationships and prefetch_related
+        for ManyToMany relationships to eliminate N+1 query problems.
 
         Returns:
             QuerySet of transactions belonging to the authenticated user
         """
-        return Transaction.objects.filter(user=self.request.user)
+        return (
+            Transaction.objects.filter(user=self.request.user)
+            .select_related("account", "credit_card", "category", "subcategory")
+            .prefetch_related("tags")
+        )
 
     def perform_create(self, serializer: serializers.BaseSerializer) -> None:
         """
@@ -104,6 +121,18 @@ class TransactionViewSet(ModelViewSet):
                 location=OpenApiParameter.QUERY,
                 description="Include inactive categories in the response",
             ),
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number (default: 1)",
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 100, max: 500)",
+            ),
         ],
         responses={200: TransactionSerializer(many=True)},
     )
@@ -144,12 +173,17 @@ class TransactionViewSet(ModelViewSet):
         inactive_categories = request.query_params.get("inactive_categories")
         if not inactive_categories:
             queryset = queryset.filter(
-                models.Q(category__isnull=True) | models.Q(category__is_active=True)
-            ).filter(
-                models.Q(subcategory__isnull=True)
-                | models.Q(subcategory__is_active=True)
+                (models.Q(category__isnull=True) | models.Q(category__is_active=True))
+                & (
+                    models.Q(subcategory__isnull=True)
+                    | models.Q(subcategory__is_active=True)
+                )
             )
 
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -422,6 +456,20 @@ class TransactionViewSet(ModelViewSet):
             "Retrieve all transactions that need review after AI classification. "
             "Only returns transactions belonging to the authenticated user."
         ),
+        parameters=[
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number (default: 1)",
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 100, max: 500)",
+            ),
+        ],
         responses={200: TransactionSerializer(many=True)},
     )
     @action(detail=False, methods=["get"], url_path="needing-review")
@@ -435,8 +483,12 @@ class TransactionViewSet(ModelViewSet):
             **kwargs: Additional keyword arguments
 
         Returns:
-            Response with list of transactions needing review
+            Response with paginated list of transactions needing review
         """
         queryset = self.get_queryset().filter(need_review=True)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
