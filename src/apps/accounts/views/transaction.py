@@ -2,7 +2,7 @@
 ViewSet for managing transactions with CRUD operations.
 
 Provides endpoints for creating, reading, updating, and deleting transactions.
-Transactions are filtered by the authenticated user and can be filtered by transaction type, account, credit card, category, and date.
+Transactions are filtered by the authenticated user and can be filtered by transaction type, account, credit card, category, subcategory, and date.
 """
 
 from typing import Any
@@ -43,7 +43,7 @@ class TransactionViewSet(ModelViewSet):
     ViewSet for managing transactions with CRUD operations.
 
     Provides endpoints for creating, reading, updating, and deleting transactions.
-    Transactions are filtered by the authenticated user and can be filtered by transaction type, account, credit card, category, and date.
+    Transactions are filtered by the authenticated user and can be filtered by transaction type, account, credit card, category, subcategory, and date.
     """
 
     permission_classes = [IsAuthenticated]
@@ -110,6 +110,12 @@ class TransactionViewSet(ModelViewSet):
                 description="Filter by category ID",
             ),
             OpenApiParameter(
+                name="subcategory_id",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Filter by subcategory ID",
+            ),
+            OpenApiParameter(
                 name="occurred_at",
                 type=str,
                 location=OpenApiParameter.QUERY,
@@ -165,6 +171,10 @@ class TransactionViewSet(ModelViewSet):
         category_id = request.query_params.get("category_id")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
+
+        subcategory_id = request.query_params.get("subcategory_id")
+        if subcategory_id:
+            queryset = queryset.filter(subcategory_id=subcategory_id)
 
         occurred_at = request.query_params.get("occurred_at")
         if occurred_at:
