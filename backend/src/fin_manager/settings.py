@@ -202,6 +202,13 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for API clients
 
+# Session Cookie Configuration for cross-origin requests
+SESSION_COOKIE_NAME = 'sessionid'  # Django default
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access for security
+SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
+SESSION_COOKIE_SAMESITE = 'Lax'  # Lax works for localhost (browsers treat localhost as same-site)
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+
 # Structlog Configuration
 # Configure structlog BEFORE Django's logging system tries to use it
 structlog.configure(
