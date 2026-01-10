@@ -185,13 +185,18 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Item
                     </th>
-                    <th
-                      v-for="month in 12"
-                      :key="month"
-                      class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {{ formatMonthName(String(month)) }}
-                    </th>
+                    <template v-for="month in 12" :key="month">
+                      <th
+                        class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {{ formatMonthName(String(month)) }}
+                      </th>
+                      <th
+                        class="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        %
+                      </th>
+                    </template>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total Anual
                     </th>
@@ -269,22 +274,27 @@
                         </div>
                       </div>
                     </td>
-                    <td
-                      v-for="month in 12"
-                      :key="month"
-                      class="px-4 py-4 whitespace-nowrap text-right text-sm"
-                      :class="[
-                        row.type === 'result' ? 'font-semibold' : '',
-                        isZeroValue(row.monthly_totals[String(month)] || '0') ? 'text-gray-400' : 
-                        row.type === 'group' 
-                          ? (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-green-500' : 'text-red-400')
-                          : row.type === 'result'
-                          ? (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-green-600' : 'text-red-600')
-                          : (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-gray-900' : 'text-red-600')
-                      ]"
-                    >
-                      {{ formatValue(row.monthly_totals[String(month)] || '0') }}
-                    </td>
+                    <template v-for="month in 12" :key="month">
+                      <td
+                        class="px-4 py-4 whitespace-nowrap text-right text-sm"
+                        :class="[
+                          row.type === 'result' ? 'font-semibold' : '',
+                          isZeroValue(row.monthly_totals[String(month)] || '0') ? 'text-gray-400' : 
+                          row.type === 'group' 
+                            ? (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-green-500' : 'text-red-400')
+                            : row.type === 'result'
+                            ? (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-green-600' : 'text-red-600')
+                            : (parseFloat(row.monthly_totals[String(month)] || '0') >= 0 ? 'text-gray-900' : 'text-red-600')
+                        ]"
+                      >
+                        {{ formatValue(row.monthly_totals[String(month)] || '0') }}
+                      </td>
+                      <td
+                        class="px-2 py-4 whitespace-nowrap text-right text-xs text-gray-500"
+                      >
+                        {{ getPercentage(row, String(month)) }}
+                      </td>
+                    </template>
                     <td
                       class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
                       :class="[
@@ -313,13 +323,18 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Item
                     </th>
-                    <th
-                      v-for="month in 12"
-                      :key="month"
-                      class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                    >
-                      {{ formatMonthName(String(month)) }}
-                    </th>
+                    <template v-for="month in 12" :key="month">
+                      <th
+                        class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {{ formatMonthName(String(month)) }}
+                      </th>
+                      <th
+                        class="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        %
+                      </th>
+                    </template>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total Anual
                     </th>
@@ -332,17 +347,22 @@
                         {{ uncategorizedRow.name }}
                       </div>
                     </td>
-                    <td
-                      v-for="month in 12"
-                      :key="month"
-                      class="px-4 py-4 whitespace-nowrap text-right text-sm"
-                      :class="[
-                        isZeroValue(uncategorizedRow.monthly_totals[String(month)] || '0') ? 'text-gray-400' : 
-                        parseFloat(uncategorizedRow.monthly_totals[String(month)] || '0') >= 0 ? 'text-gray-900' : 'text-red-600'
-                      ]"
-                    >
-                      {{ formatValue(uncategorizedRow.monthly_totals[String(month)] || '0') }}
-                    </td>
+                    <template v-for="month in 12" :key="month">
+                      <td
+                        class="px-4 py-4 whitespace-nowrap text-right text-sm"
+                        :class="[
+                          isZeroValue(uncategorizedRow.monthly_totals[String(month)] || '0') ? 'text-gray-400' : 
+                          parseFloat(uncategorizedRow.monthly_totals[String(month)] || '0') >= 0 ? 'text-gray-900' : 'text-red-600'
+                        ]"
+                      >
+                        {{ formatValue(uncategorizedRow.monthly_totals[String(month)] || '0') }}
+                      </td>
+                      <td
+                        class="px-2 py-4 whitespace-nowrap text-right text-xs text-gray-500"
+                      >
+                        <!-- Uncategorized doesn't have a parent, so no percentage -->
+                      </td>
+                    </template>
                     <td
                       class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
                       :class="[
@@ -544,6 +564,61 @@ const formatValue = (value: string): string => {
     return '-'
   }
   return formatCurrency(value)
+}
+
+// Get parent total for percentage calculation
+const getParentTotal = (row: TableRow, month: string): number => {
+  if (!currentReport.value) return 0
+  
+  // For categories, get the parent group total
+  if (row.type === 'category' && row.groupPosition !== undefined) {
+    const groupItem = currentReport.value.items.find(
+      item => item.type === 'group' && item.position === row.groupPosition
+    ) as CashFlowReportGroupItem | undefined
+    if (groupItem) {
+      return parseFloat(groupItem.monthly_totals[month] || '0')
+    }
+  }
+  
+  // For subcategories, get the parent category total
+  if (row.type === 'subcategory' && row.groupPosition !== undefined && row.categoryId !== undefined) {
+    const groupItem = currentReport.value.items.find(
+      item => item.type === 'group' && item.position === row.groupPosition
+    ) as CashFlowReportGroupItem | undefined
+    if (groupItem) {
+      const category = groupItem.categories.find(cat => cat.id === row.categoryId)
+      if (category) {
+        return parseFloat(category.monthly_totals[month] || '0')
+      }
+    }
+  }
+  
+  return 0
+}
+
+// Calculate and format percentage
+const getPercentage = (row: TableRow, month: string): string => {
+  // Only show percentages for categories and subcategories
+  if (row.type !== 'category' && row.type !== 'subcategory') {
+    return ''
+  }
+  
+  const rowValue = parseFloat(row.monthly_totals[month] || '0')
+  const parentTotal = getParentTotal(row, month)
+  
+  if (parentTotal === 0 || isNaN(rowValue) || isNaN(parentTotal)) {
+    return '-'
+  }
+  
+  const percentage = (rowValue / parentTotal) * 100
+  
+  // Handle negative values
+  if (parentTotal < 0 && rowValue < 0) {
+    const absPercentage = (Math.abs(rowValue) / Math.abs(parentTotal)) * 100
+    return `${absPercentage.toFixed(1)}%`
+  }
+  
+  return `${percentage.toFixed(1)}%`
 }
 
 const selectView = async (viewId: number) => {
