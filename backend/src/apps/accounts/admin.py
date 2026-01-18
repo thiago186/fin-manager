@@ -284,6 +284,8 @@ class TransactionAdmin(admin.ModelAdmin):
     ]
     list_filter = [
         "transaction_type",
+        "account",
+        "credit_card",
         "occurred_at",
         "category",
         "subcategory",
@@ -468,8 +470,11 @@ class ImportedReportAdmin(admin.ModelAdmin):
     """Admin configuration for the ImportedReport model."""
 
     list_display = [
+        "id",
         "file_name",
         "user",
+        "account",
+        "credit_card",
         "status",
         "handler_type",
         "success_count",
@@ -480,6 +485,8 @@ class ImportedReportAdmin(admin.ModelAdmin):
     list_filter = [
         "status",
         "handler_type",
+        "account",
+        "credit_card",
         "created_at",
         "processed_at",
     ]
@@ -488,6 +495,8 @@ class ImportedReportAdmin(admin.ModelAdmin):
         "file_path",
         "user__username",
         "user__email",
+        "account__name",
+        "credit_card__name",
         "handler_type",
         "failed_reason",
     ]
@@ -508,7 +517,7 @@ class ImportedReportAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Basic Information",
-            {"fields": ("user", "file_name", "file_path", "status")},
+            {"fields": ("user", "account", "credit_card", "file_name", "file_path", "status")},
         ),
         (
             "Processing Details",
@@ -536,7 +545,7 @@ class ImportedReportAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[ImportedReport]:
         """Optimize queryset with select_related for better performance."""
-        return super().get_queryset(request).select_related("user")
+        return super().get_queryset(request).select_related("user", "account", "credit_card")
 
     @admin.action(description="Re-run import for selected reports")
     def rerun_import(
