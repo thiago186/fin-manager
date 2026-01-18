@@ -4,9 +4,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
       <div class="flex justify-between items-center">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900">Importações CSV</h1>
+          <h1 class="text-3xl font-bold text-gray-900">Importações</h1>
           <p class="mt-1 text-sm text-gray-500">
-            Histórico de importações de transações via CSV
+            Histórico de importações de transações via CSV, JSON ou XLSX
           </p>
         </div>
         <button
@@ -14,7 +14,7 @@
           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           <ArrowUpTrayIcon class="h-4 w-4 mr-2" />
-          Importar CSV
+          Importar Arquivo
         </button>
       </div>
     </div>
@@ -64,7 +64,7 @@
             Nenhuma importação encontrada
           </h3>
           <p class="mt-1 text-sm text-gray-500">
-            Comece importando seu primeiro arquivo CSV.
+            Comece importando seu primeiro arquivo CSV, JSON ou XLSX.
           </p>
           <div class="mt-6">
             <button
@@ -72,7 +72,7 @@
               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <ArrowUpTrayIcon class="h-4 w-4 mr-2" />
-              Importar CSV
+              Importar Arquivo
             </button>
           </div>
         </div>

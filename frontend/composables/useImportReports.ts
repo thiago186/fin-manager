@@ -49,11 +49,11 @@ export const useImportReports = () => {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      
+
       if (options?.account_id) {
         formData.append('account_id', String(options.account_id))
       }
-      
+
       if (options?.credit_card_id) {
         formData.append('credit_card_id', String(options.credit_card_id))
       }
@@ -69,7 +69,7 @@ export const useImportReports = () => {
       return { success: true, data: response }
     } catch (err: any) {
       let errorMessage = 'Falha ao fazer upload do arquivo'
-      
+
       if (err?.data?.file && Array.isArray(err.data.file) && err.data.file.length > 0) {
         errorMessage = err.data.file[0]
       } else if (err?.data?.error) {
@@ -121,11 +121,11 @@ export const useImportReports = () => {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      
+
       if (options?.account_id) {
         formData.append('account_id', String(options.account_id))
       }
-      
+
       if (options?.credit_card_id) {
         formData.append('credit_card_id', String(options.credit_card_id))
       }
@@ -141,7 +141,7 @@ export const useImportReports = () => {
       return { success: true, data: response }
     } catch (err: any) {
       let errorMessage = 'Falha ao fazer upload do arquivo'
-      
+
       if (err?.data?.file && Array.isArray(err.data.file) && err.data.file.length > 0) {
         errorMessage = err.data.file[0]
       } else if (err?.data?.error) {
@@ -153,6 +153,78 @@ export const useImportReports = () => {
       error.value = errorMessage
       uploading.value = false
       console.error('Error uploading JSON:', err)
+      return {
+        success: false,
+        error: { message: errorMessage, code: err?.status?.toString() }
+      }
+    }
+  }
+
+  // Upload XLSX file
+  const uploadXLSX = async (
+    file: File,
+    options?: { account_id?: number; credit_card_id?: number }
+  ): Promise<ImportReportApiResult<CSVUploadResponse>> => {
+    uploading.value = true
+    error.value = null
+
+    // Validate file extension
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      const errorMessage = 'Por favor, selecione um arquivo XLSX (.xlsx)'
+      error.value = errorMessage
+      uploading.value = false
+      return {
+        success: false,
+        error: { message: errorMessage }
+      }
+    }
+
+    // Validate that either account_id or credit_card_id is provided
+    if (!options?.account_id && !options?.credit_card_id) {
+      const errorMessage = 'É necessário selecionar uma conta ou cartão de crédito'
+      error.value = errorMessage
+      uploading.value = false
+      return {
+        success: false,
+        error: { message: errorMessage }
+      }
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      if (options?.account_id) {
+        formData.append('account_id', String(options.account_id))
+      }
+
+      if (options?.credit_card_id) {
+        formData.append('credit_card_id', String(options.credit_card_id))
+      }
+
+      const response = await $fetch<CSVUploadResponse>('/finance/transactions/import-report/', {
+        baseURL: config.public.apiBase,
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      })
+
+      uploading.value = false
+      return { success: true, data: response }
+    } catch (err: any) {
+      let errorMessage = 'Falha ao fazer upload do arquivo'
+
+      if (err?.data?.file && Array.isArray(err.data.file) && err.data.file.length > 0) {
+        errorMessage = err.data.file[0]
+      } else if (err?.data?.error) {
+        errorMessage = err.data.error
+      } else if (err?.message) {
+        errorMessage = err.message
+      }
+
+      error.value = errorMessage
+      uploading.value = false
+      console.error('Error uploading XLSX:', err)
       return {
         success: false,
         error: { message: errorMessage, code: err?.status?.toString() }
@@ -197,7 +269,7 @@ export const useImportReports = () => {
       return { success: true, data: importReports.value }
     } catch (err: any) {
       let errorMessage = 'Falha ao carregar relatórios de importação'
-      
+
       if (err?.data?.message) {
         errorMessage = err.data.message
       } else if (err?.data?.detail) {
@@ -205,7 +277,7 @@ export const useImportReports = () => {
       } else if (err?.message) {
         errorMessage = err.message
       }
-      
+
       error.value = errorMessage
       loading.value = false
       console.error('Error loading import reports:', err)
@@ -229,7 +301,7 @@ export const useImportReports = () => {
     const poll = async () => {
       try {
         const result = await getImportReport(reportId)
-        
+
         if (!result.success || !result.data) {
           console.error('Failed to poll import status:', result.error)
           if (pollInterval) {
@@ -378,6 +450,7 @@ export const useImportReports = () => {
     // Methods
     uploadCSV,
     uploadJSON,
+    uploadXLSX,
     getImportReport,
     loadImportReports,
     pollImportStatus,

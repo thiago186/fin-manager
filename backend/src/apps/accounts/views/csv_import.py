@@ -15,18 +15,19 @@ from apps.accounts.tasks import process_import_task  # type: ignore
 
 
 class CSVImportView(APIView):
-    """API view for importing transactions from CSV or JSON files."""
+    """API view for importing transactions from CSV, JSON, or XLSX files."""
 
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FileUploadParser]
 
     @extend_schema(
         tags=["transactions"],
-        summary="Import transactions from CSV or JSON",
+        summary="Import transactions from CSV, JSON, or XLSX",
         description=(
-            "Import transactions from a CSV or JSON file asynchronously. "
+            "Import transactions from a CSV, JSON, or XLSX file asynchronously. "
             "For CSV files, the format is auto-detected based on column headers. "
             "For JSON files, the format should be an array of transaction objects with fields: name, date, total, and optionally current_installment, total_installments. "
+            "For XLSX files, the format is auto-detected based on column headers (e.g., Banco do Brasil bank statements). "
             "Categories and subcategories are matched by name and created if they don't exist. "
             "Accounts and credit cards are matched by name or ID (must exist). "
             "Tags are matched by name and created if they don't exist. "
@@ -40,7 +41,7 @@ class CSVImportView(APIView):
                     "file": {
                         "type": "string",
                         "format": "binary",
-                        "description": "CSV or JSON file containing transactions",
+                        "description": "CSV, JSON, or XLSX file containing transactions",
                     },
                     "account_id": {
                         "type": "integer",
@@ -79,10 +80,10 @@ class CSVImportView(APIView):
         ],
     )
     def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """Handle CSV or JSON file upload and trigger async import.
+        """Handle CSV, JSON, or XLSX file upload and trigger async import.
 
         Args:
-            request: The HTTP request containing the CSV or JSON file.
+            request: The HTTP request containing the CSV, JSON, or XLSX file.
             *args: Additional arguments.
             **kwargs: Additional keyword arguments.
 

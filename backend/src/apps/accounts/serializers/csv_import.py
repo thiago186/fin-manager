@@ -7,10 +7,10 @@ from apps.accounts.models.credit_card import CreditCard
 
 
 class CSVImportSerializer(serializers.Serializer):
-    """Serializer for CSV or JSON file upload validation."""
+    """Serializer for CSV, JSON, or XLSX file upload validation."""
 
     file = serializers.FileField(
-        help_text="CSV or JSON file containing transactions to import"
+        help_text="CSV, JSON, or XLSX file containing transactions to import"
     )
     account_id = serializers.IntegerField(
         required=False,
@@ -24,7 +24,7 @@ class CSVImportSerializer(serializers.Serializer):
     )
 
     def validate_file(self, value: Any) -> Any:
-        """Validate that the uploaded file is a CSV or JSON file.
+        """Validate that the uploaded file is a CSV, JSON, or XLSX file.
 
         Args:
             value: Uploaded file.
@@ -33,13 +33,13 @@ class CSVImportSerializer(serializers.Serializer):
             Validated file.
 
         Raises:
-            serializers.ValidationError: If file is not a CSV or JSON file.
+            serializers.ValidationError: If file is not a CSV, JSON, or XLSX file.
         """
         file_name_lower = value.name.lower()
 
-        if not (file_name_lower.endswith(".csv") or file_name_lower.endswith(".json")):
+        if not (file_name_lower.endswith(".csv") or file_name_lower.endswith(".json") or file_name_lower.endswith(".xlsx")):
             raise serializers.ValidationError(
-                "File must be a CSV file (.csv extension) or JSON file (.json extension)"
+                "File must be a CSV file (.csv extension), JSON file (.json extension), or XLSX file (.xlsx extension)"
             )
 
         if hasattr(value, "content_type"):
@@ -54,10 +54,15 @@ class CSVImportSerializer(serializers.Serializer):
                 "application/json",
                 "text/json",
             ]
+            xlsx_content_types = [
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel",
+                "application/xlsx",
+            ]
 
-            if content_type not in csv_content_types + json_content_types:
+            if content_type not in csv_content_types + json_content_types + xlsx_content_types:
                 raise serializers.ValidationError(
-                    f"Invalid file type: {content_type}. Expected CSV or JSON file."
+                    f"Invalid file type: {content_type}. Expected CSV, JSON, or XLSX file."
                 )
 
         return value
