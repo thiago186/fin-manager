@@ -74,6 +74,7 @@ export interface Transaction {
   tags: Tag[]
   tag_ids?: number[]
   need_review?: boolean
+  hash?: string | null
 }
 
 /**

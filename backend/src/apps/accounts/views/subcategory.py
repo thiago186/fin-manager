@@ -187,12 +187,15 @@ class SubcategoryViewSet(ModelViewSet):
     @extend_schema(
         tags=["subcategories"],
         summary="Delete subcategory",
-        description="Soft delete a subcategory (sets is_active to False)",
+        description="Delete a subcategory permanently. Transactions will have their subcategory set to NULL.",
         responses={204: None},
     )
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
-        Soft delete a subcategory by setting is_active to False.
+        Delete a subcategory permanently.
+
+        When a subcategory is deleted:
+        - All associated transactions will have their subcategory set to NULL
 
         Args:
             request: The HTTP request
@@ -202,8 +205,5 @@ class SubcategoryViewSet(ModelViewSet):
         Returns:
             Empty response with 204 status
         """
-        subcategory = self.get_object()
-        subcategory.is_active = False
-        subcategory.save(update_fields=["is_active", "updated_at"])
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return super().destroy(request, *args, **kwargs)
 

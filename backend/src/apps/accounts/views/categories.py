@@ -186,12 +186,17 @@ class CategoryViewSet(ModelViewSet):
     @extend_schema(
         tags=["categories"],
         summary="Delete category",
-        description="Soft delete a category (sets is_active to False)",
+        description="Delete a category permanently. Transactions will have their category set to NULL. Subcategories will be cascade deleted.",
         responses={204: None},
     )
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
-        Soft delete a category by setting is_active to False.
+        Delete a category permanently.
+
+        When a category is deleted:
+        - All associated transactions will have their category set to NULL
+        - All subcategories will be cascade deleted (transactions will have subcategory set to NULL)
+        - The category will be removed from any cash flow view groups
 
         Args:
             request: The HTTP request
@@ -201,10 +206,7 @@ class CategoryViewSet(ModelViewSet):
         Returns:
             Empty response with 204 status
         """
-        category = self.get_object()
-        category.is_active = False
-        category.save(update_fields=["is_active", "updated_at"])
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return super().destroy(request, *args, **kwargs)
 
     @extend_schema(
         tags=["categories"],

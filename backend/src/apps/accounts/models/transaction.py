@@ -3,6 +3,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from typing import Any
 import uuid
+import hashlib
 from apps.accounts.models.credit_card import CreditCard
 from apps.accounts.models.account import Account
 from apps.accounts.models.categories import Category
@@ -97,6 +98,14 @@ class Transaction(models.Model):
         help_text="Source of transaction creation (e.g., 'manual', report filename)",
     )
 
+    hash = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="MD5 hash of amount, description, and occurred_at for duplicate detection",
+    )
+
     # Type hints
     id: int
 
@@ -139,9 +148,23 @@ class Transaction(models.Model):
             if not self.installment_group_id:
                 self.installment_group_id = str(uuid.uuid4())
 
+    def _calculate_hash(self) -> str:
+        """Calculate MD5 hash from amount, description, and occurred_at.
+
+        Returns:
+            MD5 hash as hexadecimal string (32 characters).
+        """
+        amount_str = str(self.amount)
+        description_str = self.description or ""
+        occurred_at_str = self.occurred_at.isoformat() if self.occurred_at else ""
+
+        hash_input = f"{amount_str}|{description_str}|{occurred_at_str}"
+        return hashlib.md5(hash_input.encode("utf-8")).hexdigest()
+
     def save(self, *args: Any, **kwargs: Any) -> None:
-        """Override save to ensure clean() is called."""
+        """Override save to ensure clean() is called and hash is calculated."""
         self.full_clean()
+        self.hash = self._calculate_hash()
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

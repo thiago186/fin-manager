@@ -104,6 +104,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "tag_ids",
             "need_review",
             "origin",
+            "hash",
         ]
         read_only_fields = [
             "user",
@@ -111,6 +112,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "updated_at",
             "installment_group_id",
             "origin",
+            "hash",
         ]
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:

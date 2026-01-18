@@ -303,6 +303,7 @@ class TransactionAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         "installment_group_id",
+        "hash",
     ]
     list_editable = [
         "transaction_type",
