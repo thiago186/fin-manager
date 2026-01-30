@@ -1,0 +1,27 @@
+[project]
+name = "fin-manager"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "django>=5.2.3",
+    "djangorestframework>=3.16.0",
+    "psycopg2-binary>=2.9.10",
+]
+
+[dependency-groups]
+dev = ["mypy>=1.16.1", "ruff>=0.12.0"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+select = ["ALL"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+strict = true
+exclude = "migrations/*"
+packages = ["config", "api"]
