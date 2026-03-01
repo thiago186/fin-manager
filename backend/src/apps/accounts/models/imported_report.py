@@ -79,6 +79,11 @@ class ImportedReport(models.Model):
         default=list,
         help_text="List of error messages for failed transactions",
     )  # type: ignore
+    photo_paths = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="List of stored image file paths for photo imports",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Date and time when the import was created",

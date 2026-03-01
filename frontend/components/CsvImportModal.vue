@@ -4,12 +4,38 @@
       <DialogHeader>
         <DialogTitle>Importar Transações</DialogTitle>
         <DialogDescription>
-          Envie seu arquivo CSV, JSON ou XLSX e associe a uma conta ou cartão.
+          Envie seu arquivo ou fotos e associe a uma conta ou cartão.
         </DialogDescription>
       </DialogHeader>
 
-      <!-- File Upload Area -->
-      <div v-if="!selectedFile && !currentReport" class="mb-6">
+      <!-- Import Mode Tabs -->
+      <div v-if="!currentReport && !isUploading" class="mb-4">
+        <div class="flex rounded-lg border border-border p-1 bg-muted/30">
+          <button
+            type="button"
+            :class="[
+              'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              importMode === 'file' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            ]"
+            @click="switchMode('file')"
+          >
+            Arquivo
+          </button>
+          <button
+            type="button"
+            :class="[
+              'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              importMode === 'photo' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+            ]"
+            @click="switchMode('photo')"
+          >
+            Foto
+          </button>
+        </div>
+      </div>
+
+      <!-- File Upload Area (file mode) -->
+      <div v-if="importMode === 'file' && !selectedFile && !currentReport" class="mb-6">
         <div
           @drop.prevent="handleDrop"
           @dragover.prevent="isDragging = true"
@@ -39,8 +65,40 @@
         </div>
       </div>
 
-      <!-- Selected File Preview -->
-      <div v-if="selectedFile && !isUploading && !currentReport" class="mb-6">
+      <!-- Photo Upload Area (photo mode) -->
+      <div v-if="importMode === 'photo' && selectedPhotos.length === 0 && !currentReport" class="mb-6">
+        <div
+          @drop.prevent="handlePhotoDrop"
+          @dragover.prevent="isDragging = true"
+          @dragleave.prevent="isDragging = false"
+          :class="[
+            'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
+            isDragging ? 'border-primary/70 bg-primary/5' : 'border-border hover:border-primary/40'
+          ]"
+        >
+          <PhotoIcon class="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <p class="text-sm text-muted-foreground mb-2">
+            Arraste e solte fotos do extrato bancário aqui, ou
+          </p>
+          <Button variant="default" type="button" @click="photoInput?.click()">
+            Selecionar fotos
+          </Button>
+          <input
+            ref="photoInput"
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,.heic"
+            multiple
+            class="hidden"
+            @change="handlePhotoSelect"
+          />
+          <p class="text-xs text-muted-foreground mt-2">
+            Aceitos: .jpg, .jpeg, .png, .webp, .heic (até 10 fotos)
+          </p>
+        </div>
+      </div>
+
+      <!-- Selected File Preview (file mode) -->
+      <div v-if="importMode === 'file' && selectedFile && !isUploading && !currentReport" class="mb-6">
         <div class="rounded-lg border border-border bg-muted/30 p-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center">
@@ -59,8 +117,30 @@
         </div>
       </div>
 
+      <!-- Selected Photos Preview (photo mode) -->
+      <div v-if="importMode === 'photo' && selectedPhotos.length > 0 && !isUploading && !currentReport" class="mb-6">
+        <div class="rounded-lg border border-border bg-muted/30 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-sm font-medium">{{ selectedPhotos.length }} foto(s) selecionada(s)</p>
+            <Button variant="ghost" size="icon" @click="clearPhotos" :disabled="isUploading">
+              <XMarkIcon class="h-5 w-5" />
+            </Button>
+          </div>
+          <div class="grid grid-cols-4 gap-2">
+            <div v-for="(photo, index) in selectedPhotos" :key="index" class="relative">
+              <img
+                :src="photoPreviewUrls[index]"
+                :alt="photo.name"
+                class="w-full h-20 object-cover rounded border border-border"
+              />
+              <p class="text-xs text-muted-foreground truncate mt-1">{{ photo.name }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Account/Credit Card Selection -->
-      <div v-if="selectedFile && !isUploading && !currentReport" class="mb-6 space-y-2">
+      <div v-if="hasFileSelected && !isUploading && !currentReport" class="mb-6 space-y-2">
         <div class="flex items-center gap-1">
           <Label>Associar a conta ou cartão de crédito</Label>
           <span class="text-red-500">*</span>
@@ -166,7 +246,7 @@
 
       <DialogFooter class="gap-2">
         <Button
-          v-if="selectedFile && !isUploading && !currentReport"
+          v-if="hasFileSelected && !isUploading && !currentReport"
           type="button"
           :disabled="!selectedAccountOrCard"
           @click="handleUpload"
@@ -190,6 +270,7 @@
 import {
   CloudArrowUpIcon,
   DocumentIcon,
+  PhotoIcon,
   XMarkIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -230,6 +311,7 @@ const {
   uploadCSV,
   uploadJSON,
   uploadXLSX,
+  uploadPhotos,
   pollImportStatus,
   stopPolling,
   clearError
@@ -240,8 +322,12 @@ const { accounts, loadAccounts } = useAccounts()
 const { creditCards, loadCreditCards } = useCreditCards()
 
 // Local state
+const importMode = ref<'file' | 'photo'>('file')
 const fileInput = ref<HTMLInputElement | null>(null)
+const photoInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
+const selectedPhotos = ref<File[]>([])
+const photoPreviewUrls = ref<string[]>([])
 const selectedAccountOrCard = ref<string>('')
 const showValidationError = ref(false)
 const isDragging = ref(false)
@@ -250,6 +336,11 @@ const uploadError = ref<string | null>(null)
 const currentReport = ref<ImportReport | null>(null)
 const showErrors = ref(false)
 const stopPollingFn = ref<(() => void) | null>(null)
+
+const hasFileSelected = computed(() => {
+  if (importMode.value === 'file') return !!selectedFile.value
+  return selectedPhotos.value.length > 0
+})
 
 // Methods
 const handleFileSelect = (event: Event) => {
@@ -280,6 +371,13 @@ const handleDrop = (event: DragEvent) => {
   }
 }
 
+const switchMode = (mode: 'file' | 'photo') => {
+  if (importMode.value === mode) return
+  importMode.value = mode
+  clearFile()
+  clearPhotos()
+}
+
 const clearFile = () => {
   selectedFile.value = null
   selectedAccountOrCard.value = ''
@@ -290,8 +388,69 @@ const clearFile = () => {
   }
 }
 
+const allowedPhotoExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic']
+
+const handlePhotoSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files.length > 0) {
+    addPhotos(Array.from(target.files))
+  }
+}
+
+const handlePhotoDrop = (event: DragEvent) => {
+  isDragging.value = false
+  if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+    addPhotos(Array.from(event.dataTransfer.files))
+  }
+}
+
+const addPhotos = (files: File[]) => {
+  const validFiles: File[] = []
+  for (const file of files) {
+    const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+    if (allowedPhotoExtensions.includes(ext)) {
+      validFiles.push(file)
+    }
+  }
+
+  if (validFiles.length === 0) {
+    uploadError.value = 'Nenhum arquivo de imagem válido selecionado. Formatos aceitos: .jpg, .jpeg, .png, .webp, .heic'
+    return
+  }
+
+  const total = selectedPhotos.value.length + validFiles.length
+  if (total > 10) {
+    uploadError.value = 'Máximo de 10 fotos permitido'
+    return
+  }
+
+  uploadError.value = null
+  selectedPhotos.value = [...selectedPhotos.value, ...validFiles]
+
+  // Generate preview URLs
+  const newUrls = validFiles.map(f => URL.createObjectURL(f))
+  photoPreviewUrls.value = [...photoPreviewUrls.value, ...newUrls]
+}
+
+const clearPhotos = () => {
+  // Revoke object URLs to free memory
+  for (const url of photoPreviewUrls.value) {
+    URL.revokeObjectURL(url)
+  }
+  selectedPhotos.value = []
+  photoPreviewUrls.value = []
+  selectedAccountOrCard.value = ''
+  showValidationError.value = false
+  uploadError.value = null
+  if (photoInput.value) {
+    photoInput.value.value = ''
+  }
+}
+
 const handleUpload = async () => {
-  if (!selectedFile.value) return
+  // Validate we have files
+  if (importMode.value === 'file' && !selectedFile.value) return
+  if (importMode.value === 'photo' && selectedPhotos.value.length === 0) return
 
   // Validate account/card selection
   if (!selectedAccountOrCard.value) {
@@ -314,22 +473,27 @@ const handleUpload = async () => {
     ? { account_id: id }
     : { credit_card_id: id }
 
-  // Determine file type and call appropriate upload function
-  const fileName = selectedFile.value.name.toLowerCase()
-  let uploadFunction
-  if (fileName.endsWith('.json')) {
-    uploadFunction = uploadJSON
-  } else if (fileName.endsWith('.xlsx')) {
-    uploadFunction = uploadXLSX
-  } else {
-    uploadFunction = uploadCSV
-  }
-
   try {
-    const result = await uploadFunction(selectedFile.value, uploadOptions)
+    let result
+
+    if (importMode.value === 'photo') {
+      result = await uploadPhotos(selectedPhotos.value, uploadOptions)
+    } else {
+      // Determine file type and call appropriate upload function
+      const fileName = selectedFile.value!.name.toLowerCase()
+      let uploadFunction
+      if (fileName.endsWith('.json')) {
+        uploadFunction = uploadJSON
+      } else if (fileName.endsWith('.xlsx')) {
+        uploadFunction = uploadXLSX
+      } else {
+        uploadFunction = uploadCSV
+      }
+      result = await uploadFunction(selectedFile.value!, uploadOptions)
+    }
 
     if (!result.success || !result.data) {
-      uploadError.value = result.error?.message || 'Falha ao fazer upload do arquivo'
+      uploadError.value = result.error?.message || 'Falha ao fazer upload'
       isUploading.value = false
       return
     }
@@ -347,7 +511,7 @@ const handleUpload = async () => {
       (finalReport) => {
         // Import complete
         currentReport.value = finalReport
-        
+
         // Refresh transactions if import was successful
         if (finalReport.status === 'IMPORTED') {
           loadTransactions()
@@ -384,7 +548,9 @@ const handleClose = () => {
   uploadError.value = null
   showErrors.value = false
   isDragging.value = false
+  importMode.value = 'file'
   clearFile()
+  clearPhotos()
 
   emit('close')
 }
@@ -409,6 +575,10 @@ const formatFileSize = (bytes: number): string => {
 onUnmounted(() => {
   if (stopPollingFn.value) {
     stopPollingFn.value()
+  }
+  // Revoke photo preview URLs
+  for (const url of photoPreviewUrls.value) {
+    URL.revokeObjectURL(url)
   }
 })
 </script>

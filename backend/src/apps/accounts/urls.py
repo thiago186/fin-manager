@@ -7,6 +7,7 @@ from apps.accounts.views.cash_flow_view import CashFlowViewViewSet
 from apps.accounts.views.credit_cards import CreditCardViewSet
 from apps.accounts.views.csv_import import CSVImportView
 from apps.accounts.views.imported_report import ImportedReportViewSet
+from apps.accounts.views.photo_import import PhotoImportView
 
 router = DefaultRouter()
 router.register("categories", CategoryViewSet, basename="category")
@@ -22,6 +23,11 @@ urlpatterns = [
         "transactions/import-report/",
         CSVImportView.as_view(),
         name="transaction-import-report",
+    ),
+    path(
+        "transactions/import-photo/",
+        PhotoImportView.as_view(),
+        name="transaction-import-photo",
     ),
     path("", include(router.urls)),
 ]

@@ -232,6 +232,84 @@ export const useImportReports = () => {
     }
   }
 
+  // Upload photo files
+  const uploadPhotos = async (
+    files: File[],
+    options?: { account_id?: number; credit_card_id?: number }
+  ): Promise<ImportReportApiResult<CSVUploadResponse>> => {
+    uploading.value = true
+    error.value = null
+
+    // Validate file extensions
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.heic']
+    for (const file of files) {
+      const ext = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+      if (!allowedExtensions.includes(ext)) {
+        const errorMessage = `Arquivo '${file.name}' não é uma imagem válida. Formatos aceitos: ${allowedExtensions.join(', ')}`
+        error.value = errorMessage
+        uploading.value = false
+        return {
+          success: false,
+          error: { message: errorMessage }
+        }
+      }
+    }
+
+    // Validate that either account_id or credit_card_id is provided
+    if (!options?.account_id && !options?.credit_card_id) {
+      const errorMessage = 'É necessário selecionar uma conta ou cartão de crédito'
+      error.value = errorMessage
+      uploading.value = false
+      return {
+        success: false,
+        error: { message: errorMessage }
+      }
+    }
+
+    try {
+      const formData = new FormData()
+      for (const file of files) {
+        formData.append('photos', file)
+      }
+
+      if (options?.account_id) {
+        formData.append('account_id', String(options.account_id))
+      }
+
+      if (options?.credit_card_id) {
+        formData.append('credit_card_id', String(options.credit_card_id))
+      }
+
+      const response = await $fetch<CSVUploadResponse>('/finance/transactions/import-photo/', {
+        baseURL: config.public.apiBase,
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      })
+
+      uploading.value = false
+      return { success: true, data: response }
+    } catch (err: any) {
+      let errorMessage = 'Falha ao fazer upload das fotos'
+
+      if (err?.data?.photos && Array.isArray(err.data.photos) && err.data.photos.length > 0) {
+        errorMessage = err.data.photos[0]
+      } else if (err?.data?.error) {
+        errorMessage = err.data.error
+      } else if (err?.message) {
+        errorMessage = err.message
+      }
+
+      error.value = errorMessage
+      uploading.value = false
+      console.error('Error uploading photos:', err)
+      return {
+        success: false,
+        error: { message: errorMessage, code: err?.status?.toString() }
+      }
+    }
+  }
+
   // Get single import report by ID
   const getImportReport = async (id: number): Promise<ImportReportApiResult<ImportReport>> => {
     try {
@@ -451,6 +529,7 @@ export const useImportReports = () => {
     uploadCSV,
     uploadJSON,
     uploadXLSX,
+    uploadPhotos,
     getImportReport,
     loadImportReports,
     pollImportStatus,
