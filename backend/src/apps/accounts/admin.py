@@ -281,6 +281,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "installment_number",
         "need_review",
         "origin",
+        "hash",
     ]
     list_filter = [
         "transaction_type",
@@ -294,6 +295,7 @@ class TransactionAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "description",
+        "origin",
         "user__username",
         "user__email",
         "account__name",
