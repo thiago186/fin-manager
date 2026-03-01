@@ -11,7 +11,11 @@ The images may be multiple pages of the same statement. Treat them as one contin
    - **amount**: The transaction amount as a positive decimal number (e.g., `150.00`). Always use dot as decimal separator.
    - **transaction_type**: Either `INCOME` (credits, deposits, received amounts) or `EXPENSE` (debits, purchases, payments, withdrawals).
 
+{% if positive_as_expense %}
 3. The photo is a statement for expenses transactions. If the transaction does not have a negative signal, you should classify it as an EXPENSE. If the transaction has a negative signal, you should classify it as an INCOME.
+{% else %}
+3. The photo is a statement for income transactions. If the transaction does not have a negative signal, you should classify it as an INCOME. If the transaction has a negative signal, you should classify it as an EXPENSE.
+{% endif %}
 4. If you cannot read a value clearly, make your best effort based on context.
 
 ## Output Format

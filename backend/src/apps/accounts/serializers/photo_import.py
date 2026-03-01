@@ -34,6 +34,11 @@ class PhotoImportSerializer(serializers.Serializer):
         allow_null=True,
         help_text="ID of the credit card to associate with all imported transactions",
     )
+    positive_as_expense = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="If true, positive amounts are treated as expenses (default behavior)",
+    )
 
     def validate_photos(self, value: list) -> list:
         """Validate that all uploaded files are images with allowed extensions."""

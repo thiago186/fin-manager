@@ -483,12 +483,14 @@ class ImportedReportAdmin(admin.ModelAdmin):
         "handler_type",
         "success_count",
         "error_count",
+        "positive_as_expense",
         "created_at",
         "processed_at",
     ]
     list_filter = [
         "status",
         "handler_type",
+        "positive_as_expense",
         "account",
         "credit_card",
         "created_at",
@@ -509,6 +511,7 @@ class ImportedReportAdmin(admin.ModelAdmin):
         "updated_at",
         "processed_at",
         "errors",
+        "photo_paths",
     ]
     ordering = [
         "-created_at",
@@ -522,6 +525,10 @@ class ImportedReportAdmin(admin.ModelAdmin):
         (
             "Basic Information",
             {"fields": ("user", "account", "credit_card", "file_name", "file_path", "status")},
+        ),
+        (
+            "Photo Import Settings",
+            {"fields": ("photo_paths", "positive_as_expense")},
         ),
         (
             "Processing Details",

@@ -84,6 +84,10 @@ class ImportedReport(models.Model):
         blank=True,
         help_text="List of stored image file paths for photo imports",
     )
+    positive_as_expense = models.BooleanField(
+        default=True,
+        help_text="If True, positive amounts are treated as expenses; if False, as income",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         help_text="Date and time when the import was created",

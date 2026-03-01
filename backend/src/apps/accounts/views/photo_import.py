@@ -31,6 +31,7 @@ class PhotoImportView(APIView):
         photos = serializer.validated_data["photos"]
         account_id = serializer.validated_data.get("account_id")
         credit_card_id = serializer.validated_data.get("credit_card_id")
+        positive_as_expense = serializer.validated_data.get("positive_as_expense", True)
 
         try:
             storage_service = get_file_storage_service()
@@ -54,6 +55,7 @@ class PhotoImportView(APIView):
                 photo_paths=photo_paths,
                 account_id=account_id,
                 credit_card_id=credit_card_id,
+                positive_as_expense=positive_as_expense,
             )
 
             process_photo_import_task.delay(imported_report.id)

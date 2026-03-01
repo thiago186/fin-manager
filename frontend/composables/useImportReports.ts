@@ -235,7 +235,7 @@ export const useImportReports = () => {
   // Upload photo files
   const uploadPhotos = async (
     files: File[],
-    options?: { account_id?: number; credit_card_id?: number }
+    options?: { account_id?: number; credit_card_id?: number; positive_as_expense?: boolean }
   ): Promise<ImportReportApiResult<CSVUploadResponse>> => {
     uploading.value = true
     error.value = null
@@ -279,6 +279,8 @@ export const useImportReports = () => {
       if (options?.credit_card_id) {
         formData.append('credit_card_id', String(options.credit_card_id))
       }
+
+      formData.append('positive_as_expense', String(options?.positive_as_expense ?? true))
 
       const response = await $fetch<CSVUploadResponse>('/finance/transactions/import-photo/', {
         baseURL: config.public.apiBase,

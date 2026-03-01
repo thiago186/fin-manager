@@ -139,6 +139,20 @@
         </div>
       </div>
 
+      <!-- Positive as Expense Option (photo mode only) -->
+      <div v-if="importMode === 'photo' && selectedPhotos.length > 0 && !isUploading && !currentReport" class="mb-4">
+        <div class="flex items-center gap-2">
+          <Checkbox
+            id="positive-as-expense"
+            :checked="positiveAsExpense"
+            @update:checked="(val: boolean) => positiveAsExpense = val"
+          />
+          <Label for="positive-as-expense" class="cursor-pointer text-sm font-normal">
+            Considerar valores positivos como despesa
+          </Label>
+        </div>
+      </div>
+
       <!-- Account/Credit Card Selection -->
       <div v-if="hasFileSelected && !isUploading && !currentReport" class="mb-6 space-y-2">
         <div class="flex items-center gap-1">
@@ -298,6 +312,7 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // Emits
@@ -329,6 +344,7 @@ const selectedFile = ref<File | null>(null)
 const selectedPhotos = ref<File[]>([])
 const photoPreviewUrls = ref<string[]>([])
 const selectedAccountOrCard = ref<string>('')
+const positiveAsExpense = ref(true)
 const showValidationError = ref(false)
 const isDragging = ref(false)
 const isUploading = ref(false)
@@ -440,6 +456,7 @@ const clearPhotos = () => {
   selectedPhotos.value = []
   photoPreviewUrls.value = []
   selectedAccountOrCard.value = ''
+  positiveAsExpense.value = true
   showValidationError.value = false
   uploadError.value = null
   if (photoInput.value) {
@@ -477,7 +494,7 @@ const handleUpload = async () => {
     let result
 
     if (importMode.value === 'photo') {
-      result = await uploadPhotos(selectedPhotos.value, uploadOptions)
+      result = await uploadPhotos(selectedPhotos.value, { ...uploadOptions, positive_as_expense: positiveAsExpense.value })
     } else {
       // Determine file type and call appropriate upload function
       const fileName = selectedFile.value!.name.toLowerCase()

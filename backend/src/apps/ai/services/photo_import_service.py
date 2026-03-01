@@ -35,17 +35,22 @@ class PhotoImportService:
         self.api_key = api_key
         self.model = getattr(settings, "OPENROUTER_VISION_MODEL", "openai/gpt-5-mini")
 
-    def extract_transactions(self, photo_paths: list[str]) -> list[Transaction]:
+    def extract_transactions(
+        self,
+        photo_paths: list[str],
+        positive_as_expense: bool = True,
+    ) -> list[Transaction]:
         """Extract transactions from stored photo files.
 
         Args:
             photo_paths: List of storage paths returned by FileStorageService.
+            positive_as_expense: If True, positive amounts are expenses; if False, income.
 
         Returns:
             List of unsaved Transaction objects ready for TransactionProcessor.
         """
         image_contents = self._load_images(photo_paths)
-        prompt = self._build_prompt()
+        prompt = self._build_prompt(positive_as_expense=positive_as_expense)
         llm_response = self._call_vision_llm(image_contents, prompt)
         transactions = self._parse_response(llm_response)
         return transactions
@@ -79,11 +84,15 @@ class PhotoImportService:
 
         return images
 
-    def _build_prompt(self) -> str:
+    def _build_prompt(self, positive_as_expense: bool = True) -> str:
         """Render the extraction prompt from the Jinja2 template."""
         env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
         template = env.get_template("photo_transaction_extraction_prompt.jinja2")
-        return template.render()
+        logger.info(
+            "Building prompt",
+            positive_as_expense=positive_as_expense,
+        )
+        return template.render(positive_as_expense=positive_as_expense)
 
     def _call_vision_llm(self, images: list[dict], system_prompt: str) -> str:
         """Send images to the vision LLM and get the response.

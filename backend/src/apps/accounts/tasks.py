@@ -80,7 +80,8 @@ def process_photo_import_task(imported_report_id: int) -> None:
 
         photo_service = PhotoImportService(user=imported_report.user)
         transactions = photo_service.extract_transactions(
-            imported_report.photo_paths or []
+            imported_report.photo_paths or [],
+            positive_as_expense=imported_report.positive_as_expense,
         )
 
         if not transactions:
@@ -102,6 +103,7 @@ def process_photo_import_task(imported_report_id: int) -> None:
             logger.info(
                 "Photo import completed with no transactions",
                 imported_report_id=imported_report_id,
+                positive_as_expense=imported_report.positive_as_expense,
             )
             return
 
