@@ -282,6 +282,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "need_review",
         "origin",
         "hash",
+        "created_at",
     ]
     list_filter = [
         "transaction_type",
