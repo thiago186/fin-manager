@@ -245,6 +245,7 @@ const { loadSubcategories: loadSubcategoriesApi } = useSubcategories()
 // Local state
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
+const isInitializing = ref(false)
 
 // Get accounts from the accounts composable
 const { accounts, loadAccounts } = useAccounts()
@@ -340,6 +341,14 @@ const handleSubcategoryChange = () => {
 
 const initializeForm = async () => {
   if (props.transaction && props.isEdit) {
+    // Use nested object IDs as fallback since the API returns nested objects, not flat IDs
+    const accountId = props.transaction.account_id ?? props.transaction.account?.id ?? null
+    const creditCardId = props.transaction.credit_card_id ?? props.transaction.credit_card?.id ?? null
+    const categoryId = props.transaction.category_id ?? props.transaction.category?.id ?? null
+    const subcategoryId = props.transaction.subcategory_id ?? props.transaction.subcategory?.id ?? null
+
+    // Prevent the transaction_type watcher from resetting category/subcategory during init
+    isInitializing.value = true
     form.value = {
       transaction_type: props.transaction.transaction_type,
       amount: props.transaction.amount,
@@ -347,19 +356,18 @@ const initializeForm = async () => {
       occurred_at: props.transaction.occurred_at,
       installments_total: String(props.transaction.installments_total),
       installment_number: String(props.transaction.installment_number),
-      account_id: props.transaction.account_id ? String(props.transaction.account_id) : null,
-      credit_card_id: props.transaction.credit_card_id ? String(props.transaction.credit_card_id) : null,
-      category_id: props.transaction.category_id ? String(props.transaction.category_id) : null,
-      subcategory_id: props.transaction.subcategory_id ? String(props.transaction.subcategory_id) : null,
+      account_id: accountId ? String(accountId) : null,
+      credit_card_id: creditCardId ? String(creditCardId) : null,
+      category_id: categoryId ? String(categoryId) : null,
+      subcategory_id: subcategoryId ? String(subcategoryId) : null,
       tag_ids: props.transaction.tag_ids || []
     }
-    
-    // When editing, ensure category_id is synced from subcategory if subcategory exists
-    if (props.isEdit && form.value.subcategory_id && form.value.transaction_type) {
-      // Load subcategories first to get the category from the subcategory
+    await nextTick()
+    isInitializing.value = false
+
+    // When editing, load subcategories for the dropdown
+    if (form.value.transaction_type) {
       await loadSubcategories()
-      // Sync category from subcategory
-      handleSubcategoryChange()
     }
   } else {
     form.value = {
@@ -410,14 +418,13 @@ const handleSubmit = async () => {
 // Initialize
 onMounted(async () => {
   await Promise.all([loadCategories(), loadAccounts(), loadCreditCards()])
-  // Only initialize form if not editing (for new transactions)
-  if (!props.isEdit) {
-    initializeForm()
-  }
+  await initializeForm()
 })
 
 // Watch for transaction type changes to reset category selection
 watch(() => form.value.transaction_type, () => {
+  // Skip resetting during form initialization to preserve existing values
+  if (isInitializing.value) return
   form.value.category_id = null
   form.value.subcategory_id = null
   availableSubcategories.value = []
@@ -446,7 +453,7 @@ watch(() => props.transaction, async () => {
   if (props.transaction && props.isEdit) {
     await initializeForm()
   }
-}, { immediate: true })
+})
 
 // Watch for isEdit prop changes to re-initialize form
 watch(() => props.isEdit, async () => {
