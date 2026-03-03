@@ -1,4 +1,5 @@
 from apps.accounts.models.account import Account
+from apps.accounts.models.budget import Budget
 from apps.accounts.models.cash_flow_view import (
     CashFlowGroup,
     CashFlowResult,
@@ -13,6 +14,7 @@ from apps.accounts.models.transaction_tag import Tag
 
 __all__ = [
     "Account",
+    "Budget",
     "CashFlowGroup",
     "CashFlowResult",
     "CashFlowView",

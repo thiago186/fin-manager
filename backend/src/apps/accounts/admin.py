@@ -7,6 +7,7 @@ from django.http import HttpRequest
 
 from apps.accounts.models import (
     Account,
+    Budget,
     CashFlowGroup,
     CashFlowResult,
     CashFlowView,
@@ -64,6 +65,60 @@ class AccountAdmin(admin.ModelAdmin):
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
         ),
     )
+
+
+@admin.register(Budget)
+class BudgetAdmin(admin.ModelAdmin):
+    """Admin configuration for the Budget model."""
+
+    list_display = [
+        "id",
+        "category",
+        "user",
+        "amount",
+        "is_active",
+        "created_at",
+    ]
+    list_filter = [
+        "is_active",
+        "category__transaction_type",
+        "created_at",
+    ]
+    search_fields = [
+        "category__name",
+        "user__username",
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    list_editable = [
+        "is_active",
+        "amount",
+    ]
+    ordering = [
+        "category__name",
+    ]
+    autocomplete_fields = [
+        "category",
+    ]
+
+    fieldsets = (
+        (
+            "Basic Information",
+            {"fields": ("user", "category", "amount")},
+        ),
+        ("Status", {"fields": ("is_active",)}),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Budget]:
+        """Optimize queryset with select_related for better performance."""
+        return super().get_queryset(request).select_related("user", "category")
 
 
 @admin.register(Category)
