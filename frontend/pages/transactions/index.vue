@@ -18,7 +18,7 @@
           </Button>
           <Button variant="outline" @click="showImportModal = true">
             <ArrowUpTrayIcon class="h-4 w-4 mr-2" />
-            Importar CSV/JSON
+            Importar
           </Button>
           <Button 
             variant="outline" 
