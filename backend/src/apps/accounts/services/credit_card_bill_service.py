@@ -1,8 +1,6 @@
 import os
 from django.contrib.auth.models import User
 
-from apps.accounts.interfaces.credit_card_bill_handler import BaseCreditCardBillHandler
-from apps.accounts.models import Transaction
 from apps.accounts.models.credit_card import CreditCard
 from apps.accounts.transactions_handlers import JSONCreditCardHandler
 

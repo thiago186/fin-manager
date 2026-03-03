@@ -2,8 +2,7 @@ from typing import Any, Type
 
 from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
-from rest_framework import serializers, status
-from rest_framework.decorators import action
+from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
