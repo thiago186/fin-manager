@@ -35,7 +35,7 @@
                 type="number"
                 step="0.01"
                 min="0"
-                required
+                :required="!isInstallmentMode"
                 placeholder="0,00"
                 class="pl-10"
               />
@@ -146,7 +146,87 @@
         </div>
 
         <!-- Installments -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div v-if="!isEdit" class="flex items-center gap-2">
+          <input
+            id="installment_mode_toggle"
+            v-model="isInstallmentMode"
+            type="checkbox"
+            class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          <Label for="installment_mode_toggle" class="cursor-pointer">Criar como parcelamento</Label>
+        </div>
+
+        <!-- Installment plan form (create mode only) -->
+        <div v-if="!isEdit && isInstallmentMode" class="space-y-4 rounded-md border p-4">
+          <!-- Input mode selection -->
+          <div class="flex gap-6">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                v-model="installmentForm.input_mode"
+                type="radio"
+                value="total_and_count"
+                class="h-4 w-4 text-indigo-600"
+              />
+              <span class="text-sm">Valor total + parcelas</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                v-model="installmentForm.input_mode"
+                type="radio"
+                value="installment_and_count"
+                class="h-4 w-4 text-indigo-600"
+              />
+              <span class="text-sm">Valor por parcela + parcelas</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Amount field depends on mode -->
+            <div class="space-y-2">
+              <Label>{{ installmentForm.input_mode === 'total_and_count' ? 'Valor Total' : 'Valor da Parcela' }}</Label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">R$</span>
+                <Input
+                  v-if="installmentForm.input_mode === 'total_and_count'"
+                  v-model="installmentForm.total_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  class="pl-10"
+                />
+                <Input
+                  v-else
+                  v-model="installmentForm.installment_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  class="pl-10"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <Label>Número de Parcelas</Label>
+              <Input
+                v-model="installmentForm.installments_count"
+                type="number"
+                min="2"
+                max="360"
+                placeholder="12"
+              />
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <p v-if="installmentPreview" class="text-sm text-muted-foreground">
+            {{ installmentPreview }}
+          </p>
+        </div>
+
+        <!-- Legacy installment fields (edit mode or when not in installment mode) -->
+        <div v-if="isEdit || !isInstallmentMode" class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label>Total de Parcelas</Label>
             <Input
@@ -190,7 +270,7 @@
 
 <script setup lang="ts">
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
-import type { Transaction, TransactionForm } from '~/types/transactions'
+import type { Transaction, TransactionForm, InstallmentPlanForm } from '~/types/transactions'
 import type { CategoryList } from '~/types/categories'
 import type { SubcategoryList } from '~/types/subcategories'
 import { Button } from '@/components/ui/button'
@@ -231,13 +311,15 @@ const emit = defineEmits<{
 }>()
 
 // Composables
-const { 
-  createTransaction, 
-  updateTransaction, 
+const {
+  createTransaction,
+  updateTransaction,
   formatTransactionData,
   formatCurrency,
   clearError
 } = useTransactions()
+
+const { createInstallmentPlan, formatInstallmentPlanData } = useInstallmentPlans()
 
 const { categories, loadCategories } = useCategories()
 const { loadSubcategories: loadSubcategoriesApi } = useSubcategories()
@@ -246,6 +328,38 @@ const { loadSubcategories: loadSubcategoriesApi } = useSubcategories()
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 const isInitializing = ref(false)
+const isInstallmentMode = ref(false)
+
+const installmentForm = ref<InstallmentPlanForm>({
+  transaction_type: '',
+  description: '',
+  input_mode: 'total_and_count',
+  total_amount: '',
+  installment_amount: '',
+  installments_count: '',
+  first_due_date: new Date().toISOString().split('T')[0],
+  account_id: null,
+  credit_card_id: null,
+  category_id: null,
+  subcategory_id: null,
+})
+
+const installmentPreview = computed(() => {
+  const count = Number(installmentForm.value.installments_count)
+  if (!count || count < 2) return ''
+
+  if (installmentForm.value.input_mode === 'total_and_count') {
+    const total = Number(installmentForm.value.total_amount)
+    if (!total) return ''
+    const perInstallment = (total / count).toFixed(2)
+    return `${count}x de R$ ${Number(perInstallment).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a partir de ${installmentForm.value.first_due_date}`
+  } else {
+    const installAmt = Number(installmentForm.value.installment_amount)
+    if (!installAmt) return ''
+    const total = (installAmt * count).toFixed(2)
+    return `${count}x de R$ ${installAmt.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} = R$ ${Number(total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a partir de ${installmentForm.value.first_due_date}`
+  }
+})
 
 // Get accounts from the accounts composable
 const { accounts, loadAccounts } = useAccounts()
@@ -391,19 +505,37 @@ const handleSubmit = async () => {
   error.value = null
 
   try {
-    const transactionData = formatTransactionData(form.value)
-    
-    if (props.isEdit && props.transaction) {
-      const result = await updateTransaction(props.transaction.id, transactionData)
+    if (!props.isEdit && isInstallmentMode.value) {
+      // Sync shared fields from the main form into the installment form
+      installmentForm.value.transaction_type = form.value.transaction_type
+      installmentForm.value.description = form.value.description
+      installmentForm.value.first_due_date = form.value.occurred_at
+      installmentForm.value.account_id = form.value.account_id ? String(form.value.account_id) : null
+      installmentForm.value.credit_card_id = form.value.credit_card_id ? String(form.value.credit_card_id) : null
+      installmentForm.value.category_id = form.value.category_id ? String(form.value.category_id) : null
+      installmentForm.value.subcategory_id = form.value.subcategory_id ? String(form.value.subcategory_id) : null
+
+      const planData = formatInstallmentPlanData(installmentForm.value)
+      const result = await createInstallmentPlan(planData)
       if (!result.success) {
-        error.value = result.error?.message || 'Erro ao atualizar transação'
+        error.value = result.error?.message || 'Erro ao criar parcelamento'
         return
       }
     } else {
-      const result = await createTransaction(transactionData)
-      if (!result.success) {
-        error.value = result.error?.message || 'Erro ao criar transação'
-        return
+      const transactionData = formatTransactionData(form.value)
+
+      if (props.isEdit && props.transaction) {
+        const result = await updateTransaction(props.transaction.id, transactionData)
+        if (!result.success) {
+          error.value = result.error?.message || 'Erro ao atualizar transação'
+          return
+        }
+      } else {
+        const result = await createTransaction(transactionData)
+        if (!result.success) {
+          error.value = result.error?.message || 'Erro ao criar transação'
+          return
+        }
       }
     }
 

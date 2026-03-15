@@ -296,9 +296,16 @@ class AIClassificationService:
         return list(queryset[:limit])
 
     def _get_categorized_examples(
-        self, transaction_type: str | None, limit: int = 10
+        self, transaction_type: str | None, limit: int = 15
     ) -> list[Transaction]:
         """Get categorized transaction examples for the user.
+
+        Builds a diverse, deduplicated set of examples by:
+        1. Excluding duplicate installments (only the first installment per plan is kept)
+        2. Deduplicating by (subcategory, normalized description) so recurring transactions
+           appear only once
+        3. Picking one representative per subcategory to maximise category coverage
+        4. Filling remaining slots with the next most recent unique transactions
 
         Args:
             transaction_type: Optional filter by transaction type
@@ -309,6 +316,7 @@ class AIClassificationService:
         """
         queryset = (
             Transaction.objects.filter(user=self.user, subcategory__isnull=False)
+            .exclude(installment_plan__isnull=False, installment_number__gt=1)
             .select_related("subcategory", "subcategory__category")
             .order_by("-occurred_at")
         )
@@ -316,7 +324,34 @@ class AIClassificationService:
         if transaction_type:
             queryset = queryset.filter(transaction_type=transaction_type)
 
-        return list(queryset[:limit])
+        # Fetch a bounded pool — all deduplication happens in Python to avoid subqueries
+        candidates = list(queryset[: limit * 10])
+
+        # Deduplicate by (subcategory_id, normalised description)
+        seen_keys: set[tuple[int, str]] = set()
+        unique: list[Transaction] = []
+        for t in candidates:
+            key = (t.subcategory_id, (t.description or "").lower().strip())
+            if key not in seen_keys:
+                seen_keys.add(key)
+                unique.append(t)
+
+        # Pick one example per subcategory first to maximise coverage
+        seen_subcategories: set[int] = set()
+        per_subcategory: list[Transaction] = []
+        remainder: list[Transaction] = []
+        for t in unique:
+            if t.subcategory_id not in seen_subcategories:
+                seen_subcategories.add(t.subcategory_id)
+                per_subcategory.append(t)
+            else:
+                remainder.append(t)
+
+        examples = per_subcategory[:limit]
+        if len(examples) < limit:
+            examples += remainder[: limit - len(examples)]
+
+        return examples
 
     def _get_categories(self, transaction_type: str | None) -> list[Category]:
         """Get categories and subcategories for the user.

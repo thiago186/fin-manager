@@ -78,6 +78,10 @@ class TransactionSerializer(serializers.ModelSerializer):
         write_only=True,
     )
 
+    installment_plan_id = serializers.IntegerField(
+        source="installment_plan.id", read_only=True, allow_null=True, default=None
+    )
+
     class Meta:
         model = Transaction
         fields = [
@@ -90,6 +94,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "installments_total",
             "installment_number",
             "installment_group_id",
+            "installment_plan_id",
             "created_at",
             "updated_at",
             "account",
@@ -111,6 +116,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "installment_group_id",
+            "installment_plan_id",
             "origin",
             "hash",
         ]

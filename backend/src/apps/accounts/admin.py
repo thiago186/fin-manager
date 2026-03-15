@@ -13,6 +13,7 @@ from apps.accounts.models import (
     Category,
     CreditCard,
     ImportedReport,
+    InstallmentPlan,
     Subcategory,
     Tag,
     Transaction,
@@ -521,6 +522,47 @@ class TransactionAdmin(admin.ModelAdmin):
 
         level = "success" if total_classified > 0 else "warning"
         self.message_user(request, " ".join(message_parts), level=level)
+
+
+@admin.register(InstallmentPlan)
+class InstallmentPlanAdmin(admin.ModelAdmin):
+    """Admin configuration for the InstallmentPlan model."""
+
+    list_display = [
+        "id",
+        "description",
+        "user",
+        "transaction_type",
+        "installments_count",
+        "total_amount",
+        "installment_amount",
+        "first_due_date",
+        "created_at",
+    ]
+    list_filter = [
+        "transaction_type",
+        "first_due_date",
+    ]
+    search_fields = [
+        "description",
+        "user__username",
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    ordering = [
+        "-created_at",
+    ]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[InstallmentPlan]:
+        """Optimize queryset with select_related for better performance."""
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("user", "account", "credit_card", "category", "subcategory")
+        )
 
 
 @admin.register(ImportedReport)

@@ -12,9 +12,9 @@ The images may be multiple pages of the same statement. Treat them as one contin
    - **transaction_type**: Either `INCOME` (credits, deposits, received amounts) or `EXPENSE` (debits, purchases, payments, withdrawals).
 
 {% if positive_as_expense %}
-3. The photo is a statement for expenses transactions. If the transaction does not have a negative signal, you should classify it as an EXPENSE. If the transaction has a negative signal, you should classify it as an INCOME.
+3. Use the sign of the transaction amount to determine the type: positive values (no minus sign) are EXPENSE; negative values (with minus sign) are INCOME (refunds/credits).
 {% else %}
-3. The photo is a statement for income transactions. If the transaction does not have a negative signal, you should classify it as an INCOME. If the transaction has a negative signal, you should classify it as an EXPENSE.
+3. Use the sign of the transaction amount to determine the type: negative values (with minus sign) are EXPENSE (money spent/withdrawn); positive values (no minus sign) are INCOME (money received/deposited).
 {% endif %}
 4. If you cannot read a value clearly, make your best effort based on context.
 

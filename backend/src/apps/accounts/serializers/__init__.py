@@ -20,6 +20,10 @@ from .subcategory import (
     SubcategoryListSerializer,
     SubcategorySerializer,
 )
+from .installment_plan import (
+    InstallmentPlanCreateSerializer,
+    InstallmentPlanSerializer,
+)
 from .transaction import (
     TransactionSerializer,
 )
@@ -42,4 +46,6 @@ __all__ = [
     "SubcategoryDetailSerializer",
     "TransactionSerializer",
     "ImportedReportSerializer",
+    "InstallmentPlanCreateSerializer",
+    "InstallmentPlanSerializer",
 ]

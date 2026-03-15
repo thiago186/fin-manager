@@ -77,6 +77,13 @@ class Transaction(models.Model):
     installments_total = models.PositiveIntegerField(default=1)
     installment_number = models.PositiveIntegerField(default=1)
     installment_group_id = models.CharField(max_length=36, null=True, blank=True)
+    installment_plan = models.ForeignKey(
+        "accounts.InstallmentPlan",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transactions",
+    )
 
     created_at = models.DateTimeField(
         auto_now_add=True, help_text="The date and time the transaction was created"

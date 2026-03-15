@@ -379,9 +379,10 @@ export const useTransactions = () => {
 
     // Apply category filter
     if (filters.value.category_id) {
-      filtered = filtered.filter(transaction => 
-        transaction.category_id === filters.value.category_id
-      )
+      filtered = filtered.filter(transaction => {
+        const transactionCategoryId = transaction.category_id ?? transaction.category?.id
+        return transactionCategoryId === filters.value.category_id
+      })
     }
 
     // Apply subcategory filter

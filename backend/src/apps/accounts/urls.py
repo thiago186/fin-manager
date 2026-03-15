@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.accounts.views import BudgetViewSet, CategoryViewSet, SubcategoryViewSet, TransactionViewSet
+from apps.accounts.views import BudgetViewSet, CategoryViewSet, InstallmentPlanViewSet, SubcategoryViewSet, TransactionViewSet
 from apps.accounts.views.accounts import AccountViewSet
 from apps.accounts.views.cash_flow_view import CashFlowViewViewSet
 from apps.accounts.views.credit_cards import CreditCardViewSet
@@ -11,6 +11,7 @@ from apps.accounts.views.photo_import import PhotoImportView
 
 router = DefaultRouter()
 router.register("budgets", BudgetViewSet, basename="budget")
+router.register("installment-plans", InstallmentPlanViewSet, basename="installment-plan")
 router.register("categories", CategoryViewSet, basename="category")
 router.register("subcategories", SubcategoryViewSet, basename="subcategory")
 router.register("transactions", TransactionViewSet, basename="transaction")

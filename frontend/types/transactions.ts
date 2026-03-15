@@ -49,6 +49,65 @@ export interface Tag {
 }
 
 /**
+ * Installment input mode
+ */
+export type InstallmentInputMode = 'total_and_count' | 'installment_and_count'
+
+/**
+ * Installment plan interface
+ */
+export interface InstallmentPlan {
+  id: number
+  description: string | null
+  total_amount: string
+  installment_amount: string
+  installments_count: number
+  first_due_date: string
+  transaction_type: TransactionType
+  account: Account | null
+  credit_card: CreditCard | null
+  category: CategoryList | null
+  subcategory: CategoryList | null
+  transactions_count: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Request payload for creating an installment plan
+ */
+export interface CreateInstallmentPlanRequest {
+  transaction_type: TransactionType
+  description?: string | null
+  input_mode: InstallmentInputMode
+  total_amount?: string | null
+  installment_amount?: string | null
+  installments_count: number
+  first_due_date: string
+  account_id?: number | null
+  credit_card_id?: number | null
+  category_id?: number | null
+  subcategory_id?: number | null
+}
+
+/**
+ * Form state for installment plan creation
+ */
+export interface InstallmentPlanForm {
+  transaction_type: TransactionType | ''
+  description: string
+  input_mode: InstallmentInputMode
+  total_amount: string
+  installment_amount: string
+  installments_count: string
+  first_due_date: string
+  account_id: string | null
+  credit_card_id: string | null
+  category_id: string | null
+  subcategory_id: string | null
+}
+
+/**
  * Transaction interface
  */
 export interface Transaction {
@@ -61,6 +120,7 @@ export interface Transaction {
   installments_total: number
   installment_number: number
   installment_group_id: string | null
+  installment_plan_id?: number | null
   created_at: string
   updated_at: string
   account: Account | null
