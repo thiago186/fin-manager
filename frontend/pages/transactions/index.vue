@@ -102,8 +102,8 @@
           <CardDescription>Refine os resultados de transações.</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
-            <div class="space-y-2">
+          <div class="flex flex-wrap gap-3">
+            <div class="space-y-2 min-w-[180px] flex-[2]">
               <Label>Buscar</Label>
               <Input
                 v-model="localFilters.search"
@@ -112,7 +112,7 @@
               />
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[130px] flex-1">
               <Label>Tipo</Label>
               <Select v-model="localFilters.transaction_type">
                 <SelectTrigger>
@@ -127,7 +127,7 @@
               </Select>
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[150px] flex-1">
               <Label>Cartão de Crédito</Label>
               <Select v-model="localFilters.credit_card_id">
                 <SelectTrigger>
@@ -146,7 +146,26 @@
               </Select>
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[150px] flex-1">
+              <Label>Categoria</Label>
+              <Select v-model="localFilters.category_id">
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem :value="null">Todas</SelectItem>
+                  <SelectItem
+                    v-for="category in categories"
+                    :key="category.id"
+                    :value="category.id"
+                  >
+                    {{ category.name }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2 min-w-[150px] flex-1">
               <Label>Subcategoria</Label>
               <Select v-model="localFilters.subcategory_id">
                 <SelectTrigger>
@@ -165,17 +184,17 @@
               </Select>
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[140px] flex-1">
               <Label>Data Início</Label>
               <Input v-model="localFilters.date_from" type="date" />
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[140px] flex-1">
               <Label>Data Fim</Label>
               <Input v-model="localFilters.date_to" type="date" />
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[120px] flex-1">
               <Label>Valor Mín</Label>
               <Input
                 v-model="localFilters.amount_min"
@@ -185,7 +204,7 @@
               />
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2 min-w-[120px] flex-1">
               <Label>Valor Máx</Label>
               <Input
                 v-model="localFilters.amount_max"
@@ -609,12 +628,22 @@ const { accounts, initialize: initializeAccounts } = useAccounts()
 const { subcategories, loadSubcategories } = useSubcategories()
 const { categories, initialize: initializeCategories } = useCategories()
 
+// Helpers
+const getCurrentMonthDateRange = () => {
+  const now = new Date()
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return { date_from: fmt(firstDay), date_to: fmt(lastDay) }
+}
+
 // Local state
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showImportModal = ref(false)
 const editingTransaction = ref<Transaction | null>(null)
-const localFilters = ref<TransactionTableFilters>({})
+const localFilters = ref<TransactionTableFilters>(getCurrentMonthDateRange())
 const pendingChanges = ref<Map<number, { account_id?: number | null, credit_card_id?: number | null, category_id?: number | null, subcategory_id?: number | null }>>(new Map())
 const editingCellId = ref<number | null>(null)
 const editingSubcategoryCellId = ref<number | null>(null)
@@ -714,8 +743,8 @@ const applyFilters = async () => {
 }
 
 const clearFilters = async () => {
-  localFilters.value = {}
-  applyTableFilters({})
+  localFilters.value = getCurrentMonthDateRange()
+  applyTableFilters(localFilters.value)
   await loadPage(1)
 }
 
@@ -1055,5 +1084,6 @@ onMounted(async () => {
     initializeCategories(),
     loadSubcategories()
   ])
+  applyTableFilters(localFilters.value)
 })
 </script> 
