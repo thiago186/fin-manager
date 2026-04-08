@@ -4,6 +4,13 @@ import type {
   CreateInstallmentPlanRequest,
 } from '~/types/transactions'
 
+interface PaginatedInstallmentPlansResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: InstallmentPlan[]
+}
+
 export const useInstallmentPlans = () => {
   const config = useRuntimeConfig()
 
@@ -16,12 +23,13 @@ export const useInstallmentPlans = () => {
     error.value = null
 
     try {
-      const response = await $fetch<InstallmentPlan[]>('/finance/installment-plans/', {
+      const response = await $fetch<PaginatedInstallmentPlansResponse | InstallmentPlan[]>('/finance/installment-plans/', {
         baseURL: config.public.apiBase,
         credentials: 'include',
       })
-      installmentPlans.value = response
-      return { success: true, data: response }
+      const plans = Array.isArray(response) ? response : (response.results || [])
+      installmentPlans.value = plans
+      return { success: true, data: plans }
     } catch (err: any) {
       const errorMessage = err?.data?.message || 'Failed to load installment plans'
       error.value = errorMessage
