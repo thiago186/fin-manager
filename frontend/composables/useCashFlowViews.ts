@@ -7,6 +7,7 @@ import type {
   UpdateCashFlowViewRequest,
   CashFlowViewApiResult,
   CashFlowReport,
+  CashFlowTransactionScope,
   PaginatedCashFlowViewList
 } from '~/types/cashFlowViews'
 
@@ -73,13 +74,18 @@ export const useCashFlowViews = () => {
   }
 
   // Get cash flow report for a view and year
-  const getCashFlowReport = async (viewId: number, year: number): Promise<CashFlowViewApiResult<CashFlowReport>> => {
+  const getCashFlowReport = async (
+    viewId: number,
+    year: number,
+    transactionScope: CashFlowTransactionScope = 'all'
+  ): Promise<CashFlowViewApiResult<CashFlowReport>> => {
     reportLoading.value = true
     reportError.value = null
 
     try {
       const params = new URLSearchParams()
       params.append('year', String(year))
+      params.append('transaction_scope', transactionScope)
 
       const response = await $fetch<CashFlowReport>(`/finance/cash-flow-views/${viewId}/report/?${params}`, {
         baseURL: config.public.apiBase,

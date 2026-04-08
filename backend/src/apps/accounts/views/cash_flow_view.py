@@ -198,6 +198,16 @@ class CashFlowViewViewSet(ModelViewSet):
                 description="Year to generate the report for (e.g., 2025)",
                 required=True,
             ),
+            OpenApiParameter(
+                name="transaction_scope",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description=(
+                    "Optional transaction filter scope. "
+                    "Allowed values: 'all' (default), 'installments_only'."
+                ),
+                required=False,
+            ),
         ],
         responses={200: CashFlowReportSerializer},
     )
@@ -236,8 +246,24 @@ class CashFlowViewViewSet(ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        transaction_scope = request.query_params.get(
+            "transaction_scope", CashFlowReportService.SCOPE_ALL
+        )
+        if transaction_scope not in CashFlowReportService.VALID_TRANSACTION_SCOPES:
+            return Response(
+                {
+                    "error": (
+                        "transaction_scope must be one of: "
+                        f"{', '.join(sorted(CashFlowReportService.VALID_TRANSACTION_SCOPES))}"
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         service = CashFlowReportService(user=request.user)
-        report_data = service.generate_report(view, year)
+        report_data = service.generate_report(
+            view, year, transaction_scope=transaction_scope
+        )
 
         serializer = CashFlowReportSerializer(data=report_data)
         serializer.is_valid(raise_exception=True)

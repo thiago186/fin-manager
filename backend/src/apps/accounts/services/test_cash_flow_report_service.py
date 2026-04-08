@@ -10,6 +10,7 @@ from apps.accounts.models.cash_flow_view import (
     CashFlowView,
 )
 from apps.accounts.models.categories import Category
+from apps.accounts.models.installment_plan import InstallmentPlan
 from apps.accounts.models.subcategory import Subcategory
 from apps.accounts.models.transaction import Transaction
 from apps.accounts.services.cash_flow_report_service import CashFlowReportService
@@ -86,7 +87,7 @@ def test_generate_report_with_results() -> None:
     group2 = CashFlowGroup.objects.create(cash_flow_view=view, name="Costs", position=2)
     group2.categories.add(category2)
 
-    result = CashFlowResult.objects.create(
+    CashFlowResult.objects.create(
         cash_flow_view=view, name="Net Result", position=3
     )
 
@@ -120,7 +121,7 @@ def test_report_empty_group() -> None:
     user = User.objects.create_user(username="testuser", password="testpass")
     view = CashFlowView.objects.create(user=user, name="Test View")
 
-    group = CashFlowGroup.objects.create(
+    CashFlowGroup.objects.create(
         cash_flow_view=view, name="Empty Group", position=1
     )
 
@@ -358,3 +359,145 @@ def test_report_category_totals_equal_subcategory_sum() -> None:
 
     assert category_total == subcategory_sum
     assert category_total == Decimal("1800.00")
+
+
+@pytest.mark.django_db
+def test_generate_report_filters_installments_only_in_groups_and_results() -> None:
+    """Installments-only scope should include only transactions linked to installment plans."""
+    user = User.objects.create_user(username="scopeuser", password="testpass")
+    view = CashFlowView.objects.create(user=user, name="Installments Scope View")
+
+    category = Category.objects.create(
+        user=user, name="Sales", transaction_type=Category.TransactionType.INCOME
+    )
+
+    group = CashFlowGroup.objects.create(cash_flow_view=view, name="Revenue", position=1)
+    group.categories.add(category)
+    CashFlowResult.objects.create(cash_flow_view=view, name="Net", position=2)
+
+    year = timezone.now().year
+    first_date = timezone.now().date().replace(year=year, month=1, day=1)
+
+    plan = InstallmentPlan.objects.create(
+        user=user,
+        description="Phone",
+        total_amount=Decimal("100.00"),
+        installment_amount=Decimal("50.00"),
+        installments_count=2,
+        first_due_date=first_date,
+        transaction_type=Transaction.TransactionType.INCOME,
+    )
+
+    Transaction.objects.create(
+        user=user,
+        category=category,
+        amount=Decimal("100.00"),
+        transaction_type=Transaction.TransactionType.INCOME,
+        occurred_at=first_date,
+        installments_total=2,
+        installment_number=1,
+        installment_plan=plan,
+    )
+    Transaction.objects.create(
+        user=user,
+        category=category,
+        amount=Decimal("40.00"),
+        transaction_type=Transaction.TransactionType.INCOME,
+        occurred_at=first_date,
+    )
+
+    service = CashFlowReportService(user=user)
+
+    report_all = service.generate_report(view, year, transaction_scope="all")
+    report_installments = service.generate_report(
+        view, year, transaction_scope="installments_only"
+    )
+
+    assert Decimal(report_all["items"][0]["annual_total"]) == Decimal("140.00")
+    assert Decimal(report_all["items"][1]["annual_total"]) == Decimal("140.00")
+
+    assert Decimal(report_installments["items"][0]["annual_total"]) == Decimal("100.00")
+    assert Decimal(report_installments["items"][1]["annual_total"]) == Decimal("100.00")
+
+
+@pytest.mark.django_db
+def test_generate_report_filters_installments_only_in_uncategorized() -> None:
+    """Installments-only scope should also be respected in uncategorized item totals."""
+    user = User.objects.create_user(username="uncatuser", password="testpass")
+    view = CashFlowView.objects.create(user=user, name="Uncategorized Scope View")
+
+    year = timezone.now().year
+    first_date = timezone.now().date().replace(year=year, month=1, day=1)
+
+    plan = InstallmentPlan.objects.create(
+        user=user,
+        description="Subscription",
+        total_amount=Decimal("90.00"),
+        installment_amount=Decimal("45.00"),
+        installments_count=2,
+        first_due_date=first_date,
+        transaction_type=Transaction.TransactionType.EXPENSE,
+    )
+
+    Transaction.objects.create(
+        user=user,
+        category=None,
+        amount=Decimal("90.00"),
+        transaction_type=Transaction.TransactionType.EXPENSE,
+        occurred_at=first_date,
+        installments_total=2,
+        installment_number=1,
+        installment_plan=plan,
+    )
+    Transaction.objects.create(
+        user=user,
+        category=None,
+        amount=Decimal("30.00"),
+        transaction_type=Transaction.TransactionType.EXPENSE,
+        occurred_at=first_date,
+    )
+
+    service = CashFlowReportService(user=user)
+
+    report_all = service.generate_report(view, year, transaction_scope="all")
+    report_installments = service.generate_report(
+        view, year, transaction_scope="installments_only"
+    )
+
+    uncategorized_all = next(
+        item for item in report_all["items"] if item["type"] == "uncategorized"
+    )
+    uncategorized_installments = next(
+        item for item in report_installments["items"] if item["type"] == "uncategorized"
+    )
+
+    assert Decimal(uncategorized_all["annual_total"]) == Decimal("-120.00")
+    assert Decimal(uncategorized_installments["annual_total"]) == Decimal("-90.00")
+
+
+@pytest.mark.django_db
+def test_generate_report_defaults_to_all_transaction_scope() -> None:
+    """Calling generate_report without scope should match the explicit all scope."""
+    user = User.objects.create_user(username="defaultscopeuser", password="testpass")
+    view = CashFlowView.objects.create(user=user, name="Default Scope View")
+
+    category = Category.objects.create(
+        user=user, name="Consulting", transaction_type=Category.TransactionType.INCOME
+    )
+    group = CashFlowGroup.objects.create(cash_flow_view=view, name="Revenue", position=1)
+    group.categories.add(category)
+
+    year = timezone.now().year
+    Transaction.objects.create(
+        user=user,
+        category=category,
+        amount=Decimal("250.00"),
+        transaction_type=Transaction.TransactionType.INCOME,
+        occurred_at=timezone.now().date().replace(year=year, month=2, day=1),
+    )
+
+    service = CashFlowReportService(user=user)
+    report_default = service.generate_report(view, year)
+    report_all = service.generate_report(view, year, transaction_scope="all")
+
+    assert report_default == report_all

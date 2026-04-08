@@ -150,6 +150,31 @@
                 </option>
               </select>
             </div>
+            <div class="flex items-center space-x-2">
+              <label class="text-sm font-medium text-gray-700">Escopo:</label>
+              <div class="inline-flex rounded-md border border-gray-300 bg-white p-0.5">
+                <button
+                  type="button"
+                  class="px-3 py-1 text-sm font-medium rounded transition-colors"
+                  :class="transactionScope === 'all'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'"
+                  @click="setTransactionScope('all')"
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  class="px-3 py-1 text-sm font-medium rounded transition-colors"
+                  :class="transactionScope === 'installments_only'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'"
+                  @click="setTransactionScope('installments_only')"
+                >
+                  Parcelamentos
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -397,7 +422,11 @@ import {
   CalculatorIcon,
   PencilIcon
 } from '@heroicons/vue/24/outline'
-import type { CashFlowReportItem, CashFlowReportGroupItem } from '~/types/cashFlowViews'
+import type {
+  CashFlowReportItem,
+  CashFlowReportGroupItem,
+  CashFlowTransactionScope
+} from '~/types/cashFlowViews'
 
 // Page metadata
 definePageMeta({
@@ -422,6 +451,7 @@ const {
 const selectedViewId = ref<number | null>(null)
 const selectedViewName = ref<string>('')
 const selectedYear = ref(new Date().getFullYear())
+const transactionScope = ref<CashFlowTransactionScope>('all')
 const expandedGroups = ref<Set<number>>(new Set())
 const expandedCategories = ref<Set<number>>(new Set())
 
@@ -635,8 +665,20 @@ const loadReport = async () => {
     // Clear expanded groups and categories when loading a new report
     expandedGroups.value.clear()
     expandedCategories.value.clear()
-    await getCashFlowReport(selectedViewId.value, selectedYear.value)
+    await getCashFlowReport(
+      selectedViewId.value,
+      selectedYear.value,
+      transactionScope.value
+    )
   }
+}
+
+const setTransactionScope = async (scope: CashFlowTransactionScope) => {
+  if (transactionScope.value === scope) {
+    return
+  }
+  transactionScope.value = scope
+  await loadReport()
 }
 
 const toggleGroup = (groupPosition: number) => {

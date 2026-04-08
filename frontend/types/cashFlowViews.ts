@@ -185,6 +185,11 @@ export interface CashFlowReport {
 }
 
 /**
+ * Cash flow report transaction scope
+ */
+export type CashFlowTransactionScope = 'all' | 'installments_only'
+
+/**
  * Cash Flow View form interface for UI
  */
 export interface CashFlowViewForm {
@@ -233,4 +238,3 @@ export interface PaginatedCashFlowViewList {
   previous: string | null
   results: CashFlowView[]
 }
-

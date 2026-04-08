@@ -4,7 +4,7 @@ from typing import Any
 import structlog
 
 from django.contrib.auth.models import User
-from django.db.models import Case, DecimalField, F, Q, Sum, When
+from django.db.models import Case, DecimalField, F, Q, QuerySet, Sum, When
 from django.db.models.functions import TruncMonth
 
 from apps.accounts.models.cash_flow_view import (
@@ -22,6 +22,10 @@ logger = structlog.stdlib.get_logger()
 class CashFlowReportService:
     """Service for generating cash flow reports from views."""
 
+    SCOPE_ALL = "all"
+    SCOPE_INSTALLMENTS_ONLY = "installments_only"
+    VALID_TRANSACTION_SCOPES = {SCOPE_ALL, SCOPE_INSTALLMENTS_ONLY}
+
     def __init__(self, user: User):
         """Initialize the cash flow report service.
 
@@ -30,21 +34,31 @@ class CashFlowReportService:
         """
         self.user = user
 
-    def generate_report(self, view: CashFlowView, year: int) -> dict[str, Any]:
+    def generate_report(
+        self, view: CashFlowView, year: int, transaction_scope: str = SCOPE_ALL
+    ) -> dict[str, Any]:
         """Generate a cash flow report for a given view and year.
 
         Args:
             view: The CashFlowView to generate the report for.
             year: The year to generate the report for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary containing the report data with monthly totals for each group and result.
         """
+        if transaction_scope not in self.VALID_TRANSACTION_SCOPES:
+            raise ValueError(
+                f"Invalid transaction_scope '{transaction_scope}'. "
+                f"Must be one of: {sorted(self.VALID_TRANSACTION_SCOPES)}."
+            )
+
         logger.info(
             "Starting cash flow report generation",
             view_id=view.id,
             view_name=view.name,
             year=year,
+            transaction_scope=transaction_scope,
             user_id=self.user.pk,
         )
 
@@ -70,11 +84,15 @@ class CashFlowReportService:
                 group_position=group.position,
             )
 
-            monthly_totals = self._calculate_group_monthly_totals(group, year)
+            monthly_totals = self._calculate_group_monthly_totals(
+                group, year, transaction_scope
+            )
             annual_total = sum(monthly_totals.values())
             group_totals[group.position] = monthly_totals
 
-            categories_data = self._build_categories_with_subcategories(group, year)
+            categories_data = self._build_categories_with_subcategories(
+                group, year, transaction_scope
+            )
 
             logger.debug(
                 "Group totals calculated",
@@ -135,7 +153,7 @@ class CashFlowReportService:
             )
 
         uncategorized_monthly_totals = self._calculate_uncategorized_transactions_monthly_totals(
-            view, year
+            view, year, transaction_scope
         )
         uncategorized_annual_total = sum(uncategorized_monthly_totals.values())
 
@@ -165,6 +183,7 @@ class CashFlowReportService:
             view_id=view.id,
             view_name=view.name,
             year=year,
+            transaction_scope=transaction_scope,
             items_count=len(items),
         )
 
@@ -175,14 +194,29 @@ class CashFlowReportService:
             "items": items,
         }
 
+    def _base_transactions_queryset(
+        self, year: int, transaction_scope: str
+    ) -> QuerySet[Transaction]:
+        """Build base scoped transactions queryset for a given year."""
+        transactions = Transaction.objects.filter(
+            user=self.user,
+            occurred_at__year=year,
+        )
+
+        if transaction_scope == self.SCOPE_INSTALLMENTS_ONLY:
+            transactions = transactions.filter(installment_plan__isnull=False)
+
+        return transactions
+
     def _calculate_group_monthly_totals(
-        self, group: CashFlowGroup, year: int
+        self, group: CashFlowGroup, year: int, transaction_scope: str
     ) -> dict[int, Decimal]:
         """Calculate monthly totals for a group.
 
         Args:
             group: The CashFlowGroup to calculate totals for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
@@ -202,14 +236,15 @@ class CashFlowReportService:
             group_id=group.id,
             group_name=group.name,
             year=year,
+            transaction_scope=transaction_scope,
             category_ids=category_ids,
             categories_count=len(category_ids),
         )
 
-        transactions = Transaction.objects.filter(
-            user=self.user,
+        transactions = self._base_transactions_queryset(
+            year, transaction_scope
+        ).filter(
             category_id__in=category_ids,
-            occurred_at__year=year,
         )
 
         transactions_count = transactions.count()
@@ -218,6 +253,7 @@ class CashFlowReportService:
             group_id=group.id,
             group_name=group.name,
             year=year,
+            transaction_scope=transaction_scope,
             transactions_count=transactions_count,
         )
 
@@ -265,13 +301,14 @@ class CashFlowReportService:
         return monthly_totals
 
     def _build_categories_with_subcategories(
-        self, group: CashFlowGroup, year: int
+        self, group: CashFlowGroup, year: int, transaction_scope: str
     ) -> list[dict[str, Any]]:
         """Build categories with nested subcategories for a group.
 
         Args:
             group: The CashFlowGroup to build categories for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             List of category dictionaries with nested subcategories.
@@ -286,14 +323,17 @@ class CashFlowReportService:
                 category_id=category.id,
                 category_name=category.name,
                 year=year,
+                transaction_scope=transaction_scope,
             )
 
             category_monthly_totals = self._calculate_category_monthly_totals(
-                category, year
+                category, year, transaction_scope
             )
             category_annual_total = sum(category_monthly_totals.values())
 
-            subcategories_data = self._build_subcategories_for_category(category, year)
+            subcategories_data = self._build_subcategories_for_category(
+                category, year, transaction_scope
+            )
 
             categories_data.append(
                 {
@@ -311,13 +351,14 @@ class CashFlowReportService:
         return categories_data
 
     def _build_subcategories_for_category(
-        self, category: Category, year: int
+        self, category: Category, year: int, transaction_scope: str
     ) -> list[dict[str, Any]]:
         """Build subcategories list for a category, including uncategorized transactions.
 
         Args:
             category: The Category to build subcategories for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             List of subcategory dictionaries, including an "Uncategorized" entry if needed.
@@ -335,10 +376,11 @@ class CashFlowReportService:
                 subcategory_id=subcategory.id,
                 subcategory_name=subcategory.name,
                 year=year,
+                transaction_scope=transaction_scope,
             )
 
             subcategory_monthly_totals = self._calculate_subcategory_monthly_totals(
-                subcategory, year
+                subcategory, year, transaction_scope
             )
             subcategory_annual_total = sum(subcategory_monthly_totals.values())
 
@@ -356,7 +398,7 @@ class CashFlowReportService:
                 )
 
         uncategorized_totals = self._calculate_uncategorized_monthly_totals(
-            category, year
+            category, year, transaction_scope
         )
         uncategorized_annual_total = sum(uncategorized_totals.values())
 
@@ -376,13 +418,14 @@ class CashFlowReportService:
         return subcategories_data
 
     def _calculate_category_monthly_totals(
-        self, category: Category, year: int
+        self, category: Category, year: int, transaction_scope: str
     ) -> dict[int, Decimal]:
         """Calculate monthly totals for a category.
 
         Args:
             category: The Category to calculate totals for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
@@ -392,12 +435,13 @@ class CashFlowReportService:
             category_id=category.id,
             category_name=category.name,
             year=year,
+            transaction_scope=transaction_scope,
         )
 
-        transactions = Transaction.objects.filter(
-            user=self.user,
+        transactions = self._base_transactions_queryset(
+            year, transaction_scope
+        ).filter(
             category=category,
-            occurred_at__year=year,
         )
 
         monthly_data = (
@@ -433,13 +477,14 @@ class CashFlowReportService:
         return monthly_totals
 
     def _calculate_subcategory_monthly_totals(
-        self, subcategory: Subcategory, year: int
+        self, subcategory: Subcategory, year: int, transaction_scope: str
     ) -> dict[int, Decimal]:
         """Calculate monthly totals for a subcategory.
 
         Args:
             subcategory: The Subcategory to calculate totals for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
@@ -450,12 +495,13 @@ class CashFlowReportService:
             subcategory_name=subcategory.name,
             category_id=subcategory.category.id,
             year=year,
+            transaction_scope=transaction_scope,
         )
 
-        transactions = Transaction.objects.filter(
-            user=self.user,
+        transactions = self._base_transactions_queryset(
+            year, transaction_scope
+        ).filter(
             subcategory=subcategory,
-            occurred_at__year=year,
         )
 
         monthly_data = (
@@ -491,13 +537,14 @@ class CashFlowReportService:
         return monthly_totals
 
     def _calculate_uncategorized_monthly_totals(
-        self, category: Category, year: int
+        self, category: Category, year: int, transaction_scope: str
     ) -> dict[int, Decimal]:
         """Calculate monthly totals for transactions without subcategories in a category.
 
         Args:
             category: The Category to calculate uncategorized totals for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
@@ -507,13 +554,14 @@ class CashFlowReportService:
             category_id=category.id,
             category_name=category.name,
             year=year,
+            transaction_scope=transaction_scope,
         )
 
-        transactions = Transaction.objects.filter(
-            user=self.user,
+        transactions = self._base_transactions_queryset(
+            year, transaction_scope
+        ).filter(
             category=category,
             subcategory__isnull=True,
-            occurred_at__year=year,
         )
 
         monthly_data = (
@@ -549,7 +597,7 @@ class CashFlowReportService:
         return monthly_totals
 
     def _calculate_uncategorized_transactions_monthly_totals(
-        self, view: CashFlowView, year: int
+        self, view: CashFlowView, year: int, transaction_scope: str
     ) -> dict[int, Decimal]:
         """Calculate monthly totals for uncategorized transactions.
 
@@ -559,6 +607,7 @@ class CashFlowReportService:
         Args:
             view: The CashFlowView to calculate uncategorized totals for.
             year: The year to calculate totals for.
+            transaction_scope: Scope of transactions included in the report.
 
         Returns:
             Dictionary mapping month number (1-12) to total amount for that month.
@@ -574,22 +623,19 @@ class CashFlowReportService:
             view_id=view.id,
             view_name=view.name,
             year=year,
+            transaction_scope=transaction_scope,
             group_category_ids=list(group_category_ids),
             group_category_count=len(group_category_ids),
         )
 
+        base_transactions = self._base_transactions_queryset(year, transaction_scope)
+
         if group_category_ids:
-            transactions = Transaction.objects.filter(
-                user=self.user,
-                occurred_at__year=year,
-            ).filter(
+            transactions = base_transactions.filter(
                 Q(category__isnull=True) | ~Q(category_id__in=group_category_ids)
             )
         else:
-            transactions = Transaction.objects.filter(
-                user=self.user,
-                occurred_at__year=year,
-            )
+            transactions = base_transactions
 
         transactions_with_category = transactions.filter(category__isnull=False)
         transactions_without_category = transactions.filter(category__isnull=True)
@@ -660,6 +706,7 @@ class CashFlowReportService:
             view_id=view.id,
             view_name=view.name,
             year=year,
+            transaction_scope=transaction_scope,
             months_with_data=months_with_data,
             months_with_data_count=len(months_with_data),
         )
