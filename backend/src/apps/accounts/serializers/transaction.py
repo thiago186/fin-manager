@@ -32,6 +32,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     installments_total = serializers.IntegerField(required=False)
     installment_number = serializers.IntegerField(required=False)
     need_review = serializers.BooleanField(required=False)
+    ignore_duplicates = serializers.BooleanField(required=False)
 
     account = AccountSerializer(read_only=True)
     account_id = serializers.PrimaryKeyRelatedField(
@@ -108,6 +109,7 @@ class TransactionSerializer(serializers.ModelSerializer):
             "tags",
             "tag_ids",
             "need_review",
+            "ignore_duplicates",
             "origin",
             "hash",
         ]

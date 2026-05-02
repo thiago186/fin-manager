@@ -17,13 +17,15 @@ export const useTransactions = () => {
   // State
   const transactions = ref<Transaction[]>([])
   const transactionsNeedingReview = ref<Transaction[]>([])
+  const transactionsDuplicates = ref<Transaction[]>([])
   const loading = ref(false)
   const loadingReview = ref(false)
+  const loadingDuplicates = ref(false)
   const error = ref<string | null>(null)
   const classifying = ref(false)
   const filters = ref<TransactionTableFilters>({})
   const sort = ref<TransactionTableSort>({ key: 'occurred_at', direction: 'desc' })
-  
+
   // Pagination state
   const pagination = ref<{ count: number; next: string | null; previous: string | null; currentPage: number }>({
     count: 0,
@@ -32,6 +34,12 @@ export const useTransactions = () => {
     currentPage: 1
   })
   const paginationReview = ref<{ count: number; next: string | null; previous: string | null; currentPage: number }>({
+    count: 0,
+    next: null,
+    previous: null,
+    currentPage: 1
+  })
+  const paginationDuplicates = ref<{ count: number; next: string | null; previous: string | null; currentPage: number }>({
     count: 0,
     next: null,
     previous: null,
@@ -543,6 +551,43 @@ export const useTransactions = () => {
     }
   }
 
+  // Load transactions with duplicate hashes
+  const loadTransactionsDuplicates = async (page: number = 1): Promise<TransactionApiResult<Transaction[]>> => {
+    loadingDuplicates.value = true
+    error.value = null
+
+    try {
+      const params = new URLSearchParams()
+      params.append('page', String(page))
+      params.append('page_size', String(pageSize))
+
+      const response = await $fetch<PaginatedTransactionResponse>('/finance/transactions/duplicates/?' + params.toString(), {
+        baseURL: config.public.apiBase,
+        credentials: 'include'
+      })
+
+      transactionsDuplicates.value = response.results
+      paginationDuplicates.value = {
+        count: response.count,
+        next: response.next,
+        previous: response.previous,
+        currentPage: page
+      }
+      console.log('Duplicate transactions loaded:', response.results.length, 'of', response.count)
+      return { success: true, data: response.results }
+    } catch (err: any) {
+      const errorMessage = err?.data?.message || 'Falha ao carregar transações duplicadas'
+      error.value = errorMessage
+      console.error('Error loading duplicate transactions:', err)
+      return {
+        success: false,
+        error: { message: errorMessage, code: err?.status?.toString() }
+      }
+    } finally {
+      loadingDuplicates.value = false
+    }
+  }
+
   // Pagination navigation methods for review transactions
   const loadNextPageReview = async (): Promise<void> => {
     if (paginationReview.value.next) {
@@ -564,6 +609,27 @@ export const useTransactions = () => {
     }
   }
 
+  // Pagination navigation methods for duplicate transactions
+  const loadNextPageDuplicates = async (): Promise<void> => {
+    if (paginationDuplicates.value.next) {
+      const nextPage = paginationDuplicates.value.currentPage + 1
+      await loadTransactionsDuplicates(nextPage)
+    }
+  }
+
+  const loadPreviousPageDuplicates = async (): Promise<void> => {
+    if (paginationDuplicates.value.previous && paginationDuplicates.value.currentPage > 1) {
+      const prevPage = paginationDuplicates.value.currentPage - 1
+      await loadTransactionsDuplicates(prevPage)
+    }
+  }
+
+  const loadPageDuplicates = async (page: number): Promise<void> => {
+    if (page >= 1) {
+      await loadTransactionsDuplicates(page)
+    }
+  }
+
   // Initialize transactions data
   const initialize = async (): Promise<void> => {
     console.log('Initializing transactions...')
@@ -575,28 +641,35 @@ export const useTransactions = () => {
     // State
     transactions: readonly(transactions),
     transactionsNeedingReview: readonly(transactionsNeedingReview),
+    transactionsDuplicates: readonly(transactionsDuplicates),
     loading: readonly(loading),
     loadingReview: readonly(loadingReview),
+    loadingDuplicates: readonly(loadingDuplicates),
     error: readonly(error),
     classifying: readonly(classifying),
     filters: readonly(filters),
     sort: readonly(sort),
     pagination: readonly(pagination),
     paginationReview: readonly(paginationReview),
-    
+    paginationDuplicates: readonly(paginationDuplicates),
+
     // Computed
     filteredTransactions: getFilteredTransactions,
     transactionStats: getTransactionStats,
-    
+
     // Methods
     loadTransactions,
     loadTransactionsNeedingReview,
+    loadTransactionsDuplicates,
     loadNextPage,
     loadPreviousPage,
     loadPage,
     loadNextPageReview,
     loadPreviousPageReview,
     loadPageReview,
+    loadNextPageDuplicates,
+    loadPreviousPageDuplicates,
+    loadPageDuplicates,
     createTransaction,
     updateTransaction,
     deleteTransaction,
@@ -611,7 +684,7 @@ export const useTransactions = () => {
     getTransactionTypeColor,
     getTransactionTypeLabel,
     initialize,
-    
+
     // Clear error
     clearError: () => { error.value = null }
   }

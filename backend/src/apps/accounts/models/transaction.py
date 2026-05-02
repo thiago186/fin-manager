@@ -106,11 +106,16 @@ class Transaction(models.Model):
     )
 
     hash = models.CharField(
-        max_length=32,
+        max_length=36,
         null=True,
         blank=True,
         db_index=True,
         help_text="MD5 hash of amount, description, and occurred_at for duplicate detection",
+    )
+
+    ignore_duplicates = models.BooleanField(
+        default=False,
+        help_text="Whether this transaction should be excluded from duplicate detection",
     )
 
     # Type hints
@@ -126,6 +131,7 @@ class Transaction(models.Model):
             models.Index(fields=["user", "category"], name="txn_user_category_idx"),
             models.Index(fields=["user", "occurred_at"], name="txn_user_date_idx"),
             models.Index(fields=["user", "need_review"], name="txn_user_review_idx"),
+            models.Index(fields=["user", "ignore_duplicates"], name="txn_user_ignore_dup_idx"),
         ]
         ordering = ["-occurred_at"]
 
@@ -162,11 +168,13 @@ class Transaction(models.Model):
             MD5 hash as hexadecimal string (32 characters).
         """
         amount_str = str(self.amount)
-        description_str = self.description or ""
         occurred_at_str = self.occurred_at.isoformat() if self.occurred_at else ""
 
-        hash_input = f"{amount_str}|{description_str}|{occurred_at_str}"
-        return hashlib.md5(hash_input.encode("utf-8")).hexdigest()
+        hash_input = f"{amount_str}|{occurred_at_str}"
+        hash_prefix = 'inc_' if self.transaction_type == Transaction.TransactionType.INCOME else 'exp_'
+        result = hashlib.md5(hash_input.encode("utf-8")).hexdigest()
+        result = hash_prefix + result
+        return result
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Override save to ensure clean() is called and hash is calculated."""

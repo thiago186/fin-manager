@@ -28,6 +28,13 @@
                   class="absolute left-0 top-full z-20 hidden min-w-[180px] rounded-md border border-gray-200 bg-white py-1 shadow-lg group-hover:block group-focus-within:block"
                 >
                   <NuxtLink
+                    to="/transactions/duplicates"
+                    class="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    :class="route.path === '/transactions/duplicates' ? 'text-indigo-600 font-medium' : ''"
+                  >
+                    Duplicadas
+                  </NuxtLink>
+                  <NuxtLink
                     to="/installments"
                     class="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                     :class="route.path.startsWith('/installments') ? 'text-indigo-600 font-medium' : ''"

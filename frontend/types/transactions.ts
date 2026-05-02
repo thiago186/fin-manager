@@ -134,6 +134,7 @@ export interface Transaction {
   tags: Tag[]
   tag_ids?: number[]
   need_review?: boolean
+  ignore_duplicates?: boolean
   hash?: string | null
 }
 
@@ -366,6 +367,7 @@ export interface BulkTransactionUpdate {
   installments_total?: number
   installment_number?: number
   need_review?: boolean
+  ignore_duplicates?: boolean
 }
 
 /**

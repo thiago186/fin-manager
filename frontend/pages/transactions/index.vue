@@ -38,6 +38,12 @@
               Revisar Transações
             </NuxtLink>
           </Button>
+          <Button as-child variant="outline">
+            <NuxtLink to="/transactions/duplicates" class="inline-flex items-center">
+              <DocumentDuplicateIcon class="h-4 w-4 mr-2" />
+              Duplicadas
+            </NuxtLink>
+          </Button>
           <ButtonGroup>
             <Button @click="openCreateTransactionModal('INCOME')">
               Receita
@@ -554,7 +560,8 @@ import {
   ClockIcon,
   CheckIcon,
   SparklesIcon,
-  ClipboardDocumentCheckIcon
+  ClipboardDocumentCheckIcon,
+  DocumentDuplicateIcon
 } from '@heroicons/vue/24/outline'
 import { Button } from '@/components/ui/button'
 import {

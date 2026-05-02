@@ -11,7 +11,7 @@ import structlog
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.db import transaction as db_transaction
-from django.db.models import QuerySet
+from django.db.models import Count, QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -523,6 +523,61 @@ class TransactionViewSet(ModelViewSet):
             Response with paginated list of transactions needing review
         """
         queryset = self.get_queryset().filter(need_review=True)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @extend_schema(
+        tags=["transactions"],
+        summary="List possibly duplicated transactions",
+        description=(
+            "Retrieve all transactions that share the same hash with at least one other transaction. "
+            "Transactions are grouped by hash for duplicate detection. "
+            "Only returns transactions belonging to the authenticated user."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="page",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Page number (default: 1)",
+            ),
+            OpenApiParameter(
+                name="page_size",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of results per page (default: 100, max: 500)",
+            ),
+        ],
+        responses={200: TransactionSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="duplicates")
+    def duplicates(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """
+        Retrieve all transactions that have duplicate hashes.
+
+        Args:
+            request: The HTTP request
+            *args: Additional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Response with paginated list of transactions that share a hash with another transaction
+        """
+        queryset = self.get_queryset().filter(ignore_duplicates=False)
+
+        duplicate_hashes = (
+            queryset.exclude(hash__isnull=True)
+            .values("hash")
+            .annotate(count=Count("id"))
+            .filter(count__gt=1)
+            .values_list("hash", flat=True)
+        )
+
+        queryset = queryset.filter(hash__in=duplicate_hashes).order_by("hash", "-occurred_at")
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
