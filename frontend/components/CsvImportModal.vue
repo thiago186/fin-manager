@@ -144,8 +144,7 @@
         <div class="flex items-center gap-2">
           <Checkbox
             id="positive-as-expense"
-            :checked="positiveAsExpense"
-            @update:checked="(val: boolean) => positiveAsExpense = val"
+            v-model="positiveAsExpense"
           />
           <Label for="positive-as-expense" class="cursor-pointer text-sm font-normal">
             Considerar valores positivos como despesa

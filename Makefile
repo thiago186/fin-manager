@@ -4,7 +4,7 @@
 dev:
 	@echo "Starting all services (backend, frontend, celery)..."
 	@trap 'kill 0' EXIT; \
-	cd backend && uv run python src/manage.py runserver & \
+	cd backend && uv run python src/manage.py migrate --noinput && uv run python src/manage.py runserver & \
 	cd frontend && pnpm run dev & \
 	cd backend && PYTHONPATH=src uv run celery -A fin_manager.celery worker --loglevel=info & \
 	wait
@@ -12,7 +12,7 @@ dev:
 # Run backend server only
 backend:
 	@echo "Starting backend server..."
-	cd backend && uv run python src/manage.py runserver
+	cd backend && uv run python src/manage.py migrate --noinput && uv run python src/manage.py runserver
 
 # Run frontend server only
 frontend:
