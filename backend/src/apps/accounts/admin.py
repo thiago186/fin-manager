@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
@@ -384,6 +385,7 @@ class TransactionAdmin(admin.ModelAdmin):
     date_hierarchy = "occurred_at"
     actions = [
         "classify_with_ai",
+        "recalculate_hash",
     ]
 
     fieldsets = (
@@ -521,6 +523,47 @@ class TransactionAdmin(admin.ModelAdmin):
             message_parts.append(f"Errors: {error_summary}")
 
         level = "success" if total_classified > 0 else "warning"
+        self.message_user(request, " ".join(message_parts), level=level)
+
+    @admin.action(description="Recalculate hash for selected transactions")
+    def recalculate_hash(
+        self, request: HttpRequest, queryset: QuerySet[Transaction]
+    ) -> None:
+        """Admin action to recalculate hash for selected transactions.
+
+        Iterates over the selected transactions, calls save() with update_fields
+        to trigger hash recalculation, and reports the result. Individual
+        validation or save errors are caught so the batch continues.
+
+        Args:
+            request: HTTP request object.
+            queryset: QuerySet of Transaction instances to update.
+        """
+        updated_count = 0
+        errors: list[str] = []
+
+        for transaction in queryset:
+            try:
+                transaction.save(update_fields=["hash"])
+                updated_count += 1
+            except ValidationError as e:
+                errors.append(
+                    f"Validation error for transaction {transaction.id}: {e}"
+                )
+            except Exception as e:
+                errors.append(f"Error saving transaction {transaction.id}: {e}")
+
+        message_parts = [
+            f"Successfully recalculated hash for {updated_count} transaction{'s' if updated_count != 1 else ''}."
+        ]
+
+        if errors:
+            error_summary = "; ".join(errors[:5])
+            if len(errors) > 5:
+                error_summary += f" (and {len(errors) - 5} more errors)"
+            message_parts.append(f"Errors: {error_summary}")
+
+        level = "success" if updated_count > 0 else "warning"
         self.message_user(request, " ".join(message_parts), level=level)
 
 
