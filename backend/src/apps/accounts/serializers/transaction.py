@@ -184,3 +184,22 @@ class BulkTransactionUpdateRequestSerializer(serializers.Serializer):
     transactions = BulkTransactionUpdateItemSerializer(
         many=True, help_text="List of transaction updates"
     )
+
+
+class MonthlyCategoryTotalsSerializer(serializers.Serializer):
+    """Serializer for monthly totals grouped by category."""
+
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    transaction_type = serializers.CharField()
+    monthly_totals = serializers.DictField(
+        child=serializers.CharField(),
+        help_text="Dictionary mapping month number (1-12) to total amount as string",
+    )
+
+
+class MonthlyByCategoryResponseSerializer(serializers.Serializer):
+    """Serializer for the monthly-by-category endpoint response."""
+
+    year = serializers.IntegerField()
+    categories = MonthlyCategoryTotalsSerializer(many=True)
