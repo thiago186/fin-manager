@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
+from apps.users.models import UserNote
+
 
 class UserSerializer(serializers.ModelSerializer):
     """
@@ -48,3 +50,18 @@ class AuthResponseSerializer(serializers.Serializer):
 
     class Meta:
         extra_kwargs = {"message": {"example": "Authentication successful"}}
+
+
+class UserNoteSerializer(serializers.ModelSerializer):
+    """Serializer for the user singleton note."""
+
+    class Meta:
+        model = UserNote
+        fields = ["id", "content", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class SaveUserNoteSerializer(serializers.Serializer):
+    """Serializer for saving user note content."""
+
+    content = serializers.CharField(allow_blank=True)

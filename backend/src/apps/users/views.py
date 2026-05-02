@@ -18,9 +18,12 @@ from rest_framework.views import APIView
 
 from apps.accounts.models.credit_card import CreditCard
 from apps.accounts.serializers import CreditCardSerializer
+from apps.users.models import UserNote
 from apps.users.serializers import (
     AuthResponseSerializer,
     LoginSerializer,
+    SaveUserNoteSerializer,
+    UserNoteSerializer,
     UserResponseSerializer,
     UserSerializer,
 )
@@ -215,6 +218,50 @@ class CheckAuthView(APIView):
     def get(self, request: Request) -> Response:
         serializer = UserResponseSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    tags=["Users"],
+    summary="Get current user note",
+    description="Retrieve the authenticated user's singleton note. Creates an empty note when it does not exist.",
+    responses={
+        200: UserNoteSerializer,
+        401: OpenApiResponse(description="Unauthorized"),
+    },
+)
+@extend_schema(
+    tags=["Users"],
+    summary="Save current user note",
+    description="Create or update the authenticated user's singleton note.",
+    request=SaveUserNoteSerializer,
+    responses={
+        200: UserNoteSerializer,
+        401: OpenApiResponse(description="Unauthorized"),
+    },
+    methods=["PUT"],
+)
+class UserNoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        note, _ = UserNote.objects.get_or_create(
+            user=request.user, defaults={"content": ""}
+        )
+        serializer = UserNoteSerializer(note)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request: Request) -> Response:
+        save_serializer = SaveUserNoteSerializer(data=request.data)
+        save_serializer.is_valid(raise_exception=True)
+
+        note, _ = UserNote.objects.get_or_create(
+            user=request.user, defaults={"content": ""}
+        )
+        note.content = save_serializer.validated_data["content"]
+        note.save(update_fields=["content", "updated_at"])
+
+        response_serializer = UserNoteSerializer(note)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
 class CreditCardListPagination(PageNumberPagination):

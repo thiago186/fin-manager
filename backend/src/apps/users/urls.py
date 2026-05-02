@@ -6,6 +6,7 @@ urlpatterns = [
     path("login/", views.LoginView.as_view(), name="login"),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path("check-auth/", views.CheckAuthView.as_view(), name="check-auth"),
+    path("note/", views.UserNoteView.as_view(), name="user-note"),
     path(
         "<int:id>/credit-cards/",
         views.CreditCardListView.as_view(),
