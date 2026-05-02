@@ -2,34 +2,8 @@
   <div class="py-8">
     <!-- Page Header -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">Gráficos</h1>
-          <p class="mt-1 text-sm text-gray-500">
-            Visualize despesas por categoria ao longo do ano
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          <Button size="sm" variant="outline" @click="stacked = !stacked">
-            {{ stacked ? 'Ver agrupado' : 'Ver empilhado' }}
-          </Button>
-          <label for="year-select" class="text-sm font-medium text-gray-700">Ano:</label>
-          <Select v-model="selectedYear">
-            <SelectTrigger class="w-32">
-              <SelectValue :placeholder="String(currentYear)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="year in availableYears"
-                :key="year"
-                :value="String(year)"
-              >
-                {{ year }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <h1 class="text-3xl font-bold text-gray-900">Gráficos</h1>
+      <p class="mt-1 text-sm text-gray-500">Visualize despesas por categoria ao longo do ano</p>
     </div>
 
     <!-- Error State -->
@@ -44,72 +18,98 @@
     <div v-if="loading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="space-y-4">
         <Skeleton class="h-8 w-48" />
-        <Skeleton class="h-96 w-full" />
+        <Skeleton class="h-[520px] w-full" />
       </div>
     </div>
 
     <!-- Content -->
     <div v-else-if="data && data.categories.length > 0" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Category Filters -->
-        <Card class="lg:col-span-1 h-fit">
-          <CardHeader>
-            <CardTitle class="text-base">Categorias</CardTitle>
-            <CardDescription>
-              Selecione as categorias para exibir
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="flex items-center gap-2 mb-4 pb-4 border-b">
-              <Checkbox
-                :model-value="allSelected"
-                @update:model-value="toggleAll"
-                id="select-all"
-              />
-              <Label for="select-all" class="text-sm font-medium cursor-pointer">
-                {{ allSelected ? 'Desmarcar todas' : 'Selecionar todas' }}
-              </Label>
-            </div>
-            <div class="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              <div
-                v-for="category in data.categories"
-                :key="category.id"
-                class="flex items-center gap-2"
-              >
-                <Checkbox
-                  :id="`cat-${category.id}`"
-                  :model-value="selectedCategories[category.id]"
-                  @update:model-value="(val) => toggleCategory(category.id, val)"
-                />
-                <Label
-                  :for="`cat-${category.id}`"
-                  class="text-sm cursor-pointer flex items-center gap-2"
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <CardTitle class="text-base">
+            Despesas por Categoria — {{ selectedYear }}
+          </CardTitle>
+          <div class="flex items-center gap-2">
+            <!-- Category filter popover -->
+            <PopoverRoot>
+              <PopoverTrigger as-child>
+                <Button size="sm" variant="outline" class="gap-1.5">
+                  <SlidersHorizontal class="w-3.5 h-3.5" />
+                  Categorias
+                  <span class="text-xs text-muted-foreground">
+                    ({{ activeCount }}/{{ data.categories.length }})
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverPortal>
+                <PopoverContent
+                  class="z-50 w-64 rounded-lg border bg-popover p-4 shadow-md outline-none"
+                  :side-offset="6"
+                  align="end"
                 >
-                  <span
-                    class="inline-block w-3 h-3 rounded-full"
-                    :style="{ backgroundColor: categoryColors[category.id] }"
-                  />
-                  {{ category.name }}
-                </Label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  <div class="flex items-center gap-2 mb-3 pb-3 border-b">
+                    <Checkbox
+                      :model-value="allSelected"
+                      @update:model-value="toggleAll"
+                      id="select-all"
+                    />
+                    <Label for="select-all" class="text-sm font-medium cursor-pointer">
+                      {{ allSelected ? 'Desmarcar todas' : 'Selecionar todas' }}
+                    </Label>
+                  </div>
+                  <div class="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    <div
+                      v-for="category in data.categories"
+                      :key="category.id"
+                      class="flex items-center gap-2"
+                    >
+                      <Checkbox
+                        :id="`cat-${category.id}`"
+                        :model-value="selectedCategories[category.id]"
+                        @update:model-value="(val) => toggleCategory(category.id, val)"
+                      />
+                      <Label
+                        :for="`cat-${category.id}`"
+                        class="text-sm cursor-pointer flex items-center gap-2"
+                      >
+                        <span
+                          class="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                          :style="{ backgroundColor: categoryColors[category.id] }"
+                        />
+                        {{ category.name }}
+                      </Label>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </PopoverPortal>
+            </PopoverRoot>
 
-        <!-- Chart -->
-        <Card class="lg:col-span-3">
-          <CardHeader>
-            <CardTitle class="text-base">
-              Despesas por Categoria — {{ selectedYear }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="relative h-[500px] w-full">
-              <Bar :data="chartData" :options="chartOptions" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Button size="sm" variant="outline" @click="stacked = !stacked">
+              {{ stacked ? 'Ver agrupado' : 'Ver empilhado' }}
+            </Button>
+
+            <Select v-model="selectedYear">
+              <SelectTrigger class="w-28 h-9 text-sm">
+                <SelectValue :placeholder="String(currentYear)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="year in availableYears"
+                  :key="year"
+                  :value="String(year)"
+                >
+                  {{ year }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div class="relative h-[520px] w-full">
+            <Bar :data="chartData" :options="chartOptions" />
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Empty State -->
@@ -135,6 +135,8 @@ import {
   type ChartData,
   type ChartOptions
 } from 'chart.js'
+import { PopoverRoot, PopoverTrigger, PopoverContent, PopoverPortal } from 'reka-ui'
+import { SlidersHorizontal } from 'lucide-vue-next'
 import {
   Select,
   SelectContent,
@@ -142,7 +144,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
@@ -187,6 +189,11 @@ const allSelected = computed(() => {
   return data.value.categories.every((cat) => selectedCategories.value[cat.id])
 })
 
+const activeCount = computed(() => {
+  if (!data.value) return 0
+  return data.value.categories.filter((cat) => selectedCategories.value[cat.id]).length
+})
+
 function toggleAll(value: boolean | 'indeterminate') {
   if (!data.value) return
   const next: Record<number, boolean> = {}
@@ -218,10 +225,7 @@ const chartData = computed<ChartData<'bar'>>(() => {
       maxBarThickness: stacked.value ? undefined : 20
     }))
 
-  return {
-    labels: monthLabels,
-    datasets
-  }
+  return { labels: monthLabels, datasets }
 })
 
 const chartOptions = computed<ChartOptions<'bar'>>(() => ({
@@ -251,17 +255,13 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
   scales: {
     x: {
       stacked: stacked.value,
-      grid: {
-        display: false
-      }
+      grid: { display: false }
     },
     y: {
       stacked: stacked.value,
       beginAtZero: true,
       ticks: {
-        callback: (value) => {
-          return formatCurrency(Number(value))
-        }
+        callback: (value) => formatCurrency(Number(value))
       }
     }
   },
