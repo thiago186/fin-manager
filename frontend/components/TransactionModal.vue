@@ -9,6 +9,11 @@
       </DialogHeader>
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
+        <!-- Installment plan warning banner -->
+        <div v-if="isEdit && isPlanTransaction" class="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+          Esta transação faz parte de um parcelamento. Alterações no valor, número de parcelas, data ou conta/categoria afetarão todas as parcelas.
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Transaction Type -->
           <div class="space-y-2">
@@ -238,7 +243,11 @@
           </div>
           <div class="space-y-2">
             <Label>Parcela Atual</Label>
+            <div v-if="isEdit && isPlanTransaction" class="flex items-center h-10 rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+              Parcela {{ form.installment_number }} de {{ form.installments_total }}
+            </div>
             <Input
+              v-else
               v-model="form.installment_number"
               type="number"
               min="1"
@@ -329,6 +338,10 @@ const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 const isInitializing = ref(false)
 const isInstallmentMode = ref(false)
+
+const isPlanTransaction = computed(() => {
+  return props.isEdit && !!props.transaction?.installment_plan_id
+})
 
 const installmentForm = ref<InstallmentPlanForm>({
   transaction_type: '',

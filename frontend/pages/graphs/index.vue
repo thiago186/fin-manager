@@ -15,15 +15,19 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div v-if="loading" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
       <div class="space-y-4">
         <Skeleton class="h-8 w-48" />
         <Skeleton class="h-[520px] w-full" />
       </div>
+      <div class="space-y-4">
+        <Skeleton class="h-8 w-48" />
+        <Skeleton class="h-[400px] w-full" />
+      </div>
     </div>
 
     <!-- Content -->
-    <div v-else-if="data && data.categories.length > 0" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div v-else-if="data && data.categories.length > 0" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
       <Card>
         <CardHeader class="flex flex-row items-center justify-between gap-4 flex-wrap">
           <CardTitle class="text-base">
@@ -110,6 +114,48 @@
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader class="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <CardTitle class="text-base">
+            Categoria vs Orçamento — {{ selectedYear }}
+          </CardTitle>
+          <div class="flex items-center gap-2">
+            <Select v-model="selectedCategoryId">
+              <SelectTrigger class="w-56 h-9 text-sm">
+                <SelectValue placeholder="Selecione uma categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="category in data.categories"
+                  :key="category.id"
+                  :value="String(category.id)"
+                >
+                  {{ category.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div class="relative h-[400px] w-full">
+            <Bar :data="categoryBudgetChartData" :options="categoryBudgetChartOptions" />
+          </div>
+          <div v-if="selectedCategoryBudget" class="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
+            <div class="flex items-center gap-1.5">
+              <span class="inline-block w-3 h-3 rounded-sm bg-blue-500" />
+              <span>Despesas</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="inline-block w-6 h-0.5 bg-red-500 border-t border-dashed border-red-500" style="background: transparent; border-top-width: 2px; border-top-style: dashed;" />
+              <span>Orçamento: {{ formatCurrency(parseFloat(selectedCategoryBudget.amount)) }}</span>
+            </div>
+          </div>
+          <div v-else class="mt-4 text-sm text-muted-foreground">
+            Nenhum orçamento definido para esta categoria.
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
     <!-- Empty State -->
@@ -130,6 +176,9 @@ import {
   Tooltip,
   Legend,
   BarElement,
+  LineElement,
+  PointElement,
+  LineController,
   CategoryScale,
   LinearScale,
   type ChartData,
@@ -153,14 +202,16 @@ import { Button } from '@/components/ui/button'
 
 definePageMeta({ middleware: 'auth' })
 
-ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
+ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale)
 
 const { data, loading, error, loadMonthlyByCategory } = useGraphs()
+const { budgets, loadBudgets } = useBudgets()
 
 const currentYear = new Date().getFullYear()
 const selectedYear = ref(String(currentYear))
 const selectedCategories = ref<Record<number, boolean>>({})
 const stacked = ref(true)
+const selectedCategoryId = ref<string | null>(null)
 
 const availableYears = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
@@ -271,6 +322,105 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
   }
 }))
 
+// --- Category vs Budget Chart ---
+
+const selectedCategory = computed(() => {
+  if (!data.value || !selectedCategoryId.value) return null
+  const id = Number(selectedCategoryId.value)
+  return data.value.categories.find((c) => c.id === id) || null
+})
+
+const selectedCategoryBudget = computed(() => {
+  if (!selectedCategoryId.value || !budgets.value.length) return null
+  const id = Number(selectedCategoryId.value)
+  return budgets.value.find((b) => b.category.id === id) || null
+})
+
+const categoryBudgetChartData = computed<ChartData<'bar'>>(() => {
+  if (!selectedCategory.value) return { labels: [], datasets: [] }
+
+  const cat = selectedCategory.value
+  const expenseData = Array.from({ length: 12 }, (_, i) => {
+    const val = cat.monthly_totals[String(i + 1)]
+    return val ? parseFloat(val) : 0
+  })
+
+  const datasets: any[] = [
+    {
+      type: 'bar' as const,
+      label: 'Despesas',
+      data: expenseData,
+      backgroundColor: '#3b82f6',
+      borderColor: '#3b82f6',
+      borderWidth: 1,
+      borderRadius: 4,
+      maxBarThickness: 40
+    }
+  ]
+
+  if (selectedCategoryBudget.value) {
+    const budgetAmount = parseFloat(selectedCategoryBudget.value.amount)
+    datasets.push({
+      type: 'line' as const,
+      label: 'Orçamento',
+      data: Array(12).fill(budgetAmount),
+      borderColor: '#ef4444',
+      backgroundColor: '#ef4444',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      fill: false,
+      tension: 0,
+      order: 0
+    })
+  }
+
+  return { labels: monthLabels, datasets }
+})
+
+const categoryBudgetChartOptions = computed<ChartOptions<'bar'>>(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'bottom',
+      labels: {
+        boxWidth: 12,
+        padding: 16,
+        usePointStyle: true
+      }
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+      callbacks: {
+        label: (context) => {
+          const value = context.parsed.y as number
+          if (value === 0 && context.dataset.type === 'line') return null as any
+          return `${context.dataset.label}: ${formatCurrency(value)}`
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: { display: false }
+    },
+    y: {
+      beginAtZero: true,
+      ticks: {
+        callback: (value) => formatCurrency(Number(value))
+      }
+    }
+  },
+  interaction: {
+    mode: 'index',
+    intersect: false
+  }
+}))
+
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -280,25 +430,31 @@ function formatCurrency(value: number): string {
 
 watch(selectedYear, async (year) => {
   if (year) {
-    await loadMonthlyByCategory(Number(year))
+    await Promise.all([loadMonthlyByCategory(Number(year)), loadBudgets()])
     if (data.value) {
       const next: Record<number, boolean> = {}
       for (const cat of data.value.categories) {
         next[cat.id] = true
       }
       selectedCategories.value = next
+      if (!selectedCategoryId.value && data.value.categories.length > 0) {
+        selectedCategoryId.value = String(data.value.categories[0].id)
+      }
     }
   }
 })
 
 onMounted(async () => {
-  await loadMonthlyByCategory(Number(selectedYear.value))
+  await Promise.all([loadMonthlyByCategory(Number(selectedYear.value)), loadBudgets()])
   if (data.value) {
     const next: Record<number, boolean> = {}
     for (const cat of data.value.categories) {
       next[cat.id] = true
     }
     selectedCategories.value = next
+    if (data.value.categories.length > 0) {
+      selectedCategoryId.value = String(data.value.categories[0].id)
+    }
   }
 })
 </script>

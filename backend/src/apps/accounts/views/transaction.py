@@ -11,9 +11,7 @@ import structlog
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django.db import transaction as db_transaction
-from django.db.models import Count, QuerySet, Sum
-from django.db.models.functions import TruncMonth
-from decimal import Decimal
+from django.db.models import Count, QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.decorators import action
@@ -27,8 +25,8 @@ from apps.accounts.models.transaction import Transaction
 from apps.accounts.serializers import TransactionSerializer
 from apps.accounts.serializers.transaction import (
     BulkTransactionUpdateRequestSerializer,
-    MonthlyByCategoryResponseSerializer,
 )
+from apps.accounts.services.installment_update_service import InstallmentUpdateService
 
 logger = structlog.stdlib.get_logger()
 
@@ -77,6 +75,69 @@ class TransactionViewSet(ModelViewSet):
             serializer: The transaction serializer instance
         """
         serializer.save(user=self.request.user)
+
+    def _snapshot_plan_fields(self, instance: Transaction) -> dict:
+        """Capture current values of fields that can trigger a plan cascade."""
+        return {
+            "amount": instance.amount,
+            "installments_total": instance.installments_total,
+            "occurred_at": instance.occurred_at,
+            "account": instance.account,
+            "credit_card": instance.credit_card,
+            "category": instance.category,
+            "subcategory": instance.subcategory,
+            "transaction_type": instance.transaction_type,
+        }
+
+    def _detect_plan_changes(
+        self, instance: Transaction, old: dict
+    ) -> dict:
+        """Compare current instance values with the snapshot and return changed fields."""
+        changed: dict = {}
+
+        if instance.amount != old["amount"]:
+            changed["amount"] = instance.amount
+
+        if instance.installments_total != old["installments_total"]:
+            changed["installments_total"] = instance.installments_total
+
+        if instance.occurred_at != old["occurred_at"]:
+            changed["occurred_at"] = instance.occurred_at
+
+        if instance.account != old["account"]:
+            changed["account"] = instance.account
+
+        if instance.credit_card != old["credit_card"]:
+            changed["credit_card"] = instance.credit_card
+
+        if instance.category != old["category"]:
+            changed["category"] = instance.category
+
+        if instance.subcategory != old["subcategory"]:
+            changed["subcategory"] = instance.subcategory
+
+        if instance.transaction_type != old["transaction_type"]:
+            changed["transaction_type"] = instance.transaction_type
+
+        return changed
+
+    def _update_with_plan_sync(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        """Run the normal DRF update then cascade changes to the installment plan if needed."""
+        instance = self.get_object()
+        old_values = self._snapshot_plan_fields(instance)
+
+        response = super().update(request, *args, **kwargs)
+
+        instance.refresh_from_db()
+        if instance.installment_plan:
+            changed = self._detect_plan_changes(instance, old_values)
+            if changed:
+                service = InstallmentUpdateService()
+                service.update_plan_from_transaction(
+                    instance.installment_plan, instance, changed
+                )
+
+        return response
 
     @extend_schema(
         tags=["transactions"],
@@ -252,6 +313,9 @@ class TransactionViewSet(ModelViewSet):
         """
         Update a transaction.
 
+        If the transaction belongs to an installment plan, structural changes
+        are cascaded to all sibling transactions.
+
         Args:
             request: The HTTP request
             *args: Additional arguments
@@ -260,7 +324,7 @@ class TransactionViewSet(ModelViewSet):
         Returns:
             Response with updated transaction
         """
-        return super().update(request, *args, **kwargs)
+        return self._update_with_plan_sync(request, *args, **kwargs)
 
     @extend_schema(
         tags=["transactions"],
@@ -273,6 +337,9 @@ class TransactionViewSet(ModelViewSet):
         """
         Partially update a transaction.
 
+        If the transaction belongs to an installment plan, structural changes
+        are cascaded to all sibling transactions.
+
         Args:
             request: The HTTP request
             *args: Additional arguments
@@ -281,7 +348,7 @@ class TransactionViewSet(ModelViewSet):
         Returns:
             Response with updated transaction
         """
-        return super().partial_update(request, *args, **kwargs)
+        return self._update_with_plan_sync(request, *args, **kwargs)
 
     @extend_schema(
         tags=["transactions"],
@@ -587,89 +654,3 @@ class TransactionViewSet(ModelViewSet):
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-    @extend_schema(
-        tags=["transactions"],
-        summary="Monthly expenses by category",
-        description=(
-            "Retrieve monthly expense totals grouped by active category for a given year. "
-            "Only expense transactions are included. Inactive categories are excluded."
-        ),
-        parameters=[
-            OpenApiParameter(
-                name="year",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Year to filter transactions (e.g., 2025)",
-                required=True,
-            ),
-        ],
-        responses={200: MonthlyByCategoryResponseSerializer},
-    )
-    @action(detail=False, methods=["get"], url_path="monthly-by-category")
-    def monthly_by_category(self, request: Request, *args: Any, **kwargs: Any) -> Response:
-        """
-        Retrieve monthly expense totals grouped by category.
-
-        Args:
-            request: The HTTP request
-            *args: Additional arguments
-            **kwargs: Additional keyword arguments
-
-        Returns:
-            Response with year and list of categories with monthly totals
-        """
-        year_str = request.query_params.get("year")
-        if not year_str:
-            return Response(
-                {"error": "The 'year' query parameter is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            year = int(year_str)
-        except ValueError:
-            return Response(
-                {"error": "The 'year' query parameter must be a valid integer."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        transactions = (
-            Transaction.objects.filter(
-                user=request.user,
-                occurred_at__year=year,
-                transaction_type=Transaction.TransactionType.EXPENSE,
-                category__isnull=False,
-                category__is_active=True,
-            )
-            .annotate(month=TruncMonth("occurred_at"))
-            .values("category__id", "category__name", "category__transaction_type", "month")
-            .annotate(total=Sum("amount"))
-            .order_by("category__name", "month")
-        )
-
-        categories_map: dict[int, dict[str, Any]] = {}
-        for entry in transactions:
-            category_id = entry["category__id"]
-            if category_id not in categories_map:
-                categories_map[category_id] = {
-                    "id": category_id,
-                    "name": entry["category__name"],
-                    "transaction_type": entry["category__transaction_type"],
-                    "monthly_totals": {
-                        str(month): "0.00" for month in range(1, 13)
-                    },
-                }
-            month = entry["month"].month
-            categories_map[category_id]["monthly_totals"][str(month)] = str(
-                entry["total"] or Decimal("0.00")
-            )
-
-        response_data = {
-            "year": year,
-            "categories": list(categories_map.values()),
-        }
-
-        serializer = MonthlyByCategoryResponseSerializer(data=response_data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data)
