@@ -2,6 +2,7 @@ from typing import Any
 
 import structlog
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import transaction as db_transaction
 
 from apps.accounts.models.account import Account
@@ -142,6 +143,12 @@ class TransactionProcessor:
                         transaction_index=idx,
                         credit_card_id=report_credit_card.id,  # type: ignore
                         credit_card_name=report_credit_card.name,
+                    )
+
+                # Validate that at least one of account or credit_card is set
+                if not transaction.account and not transaction.credit_card:
+                    raise ValidationError(
+                        "Transaction must have either an account or a credit card"
                     )
 
                 # Match category if name provided
@@ -395,6 +402,9 @@ class TransactionProcessor:
 
         Returns:
             Subcategory instance (existing or newly created), or None if not found.
+
+        Raises:
+            ValidationError: If a subcategory with the same name exists under a different category.
         """
         subcategory = Subcategory.objects.filter(
             user=self.user,
@@ -404,6 +414,18 @@ class TransactionProcessor:
 
         if subcategory:
             return subcategory
+
+        # Check if subcategory exists under a different category
+        existing_in_other = Subcategory.objects.filter(
+            user=self.user,
+            name__iexact=name,
+        ).exclude(category=category).first()
+
+        if existing_in_other:
+            raise ValidationError(
+                f"Subcategory '{name}' already exists under category "
+                f"'{existing_in_other.category.name}'"
+            )
 
         subcategory = Subcategory.objects.create(
             user=self.user,
