@@ -101,6 +101,9 @@
         </Card>
       </div>
 
+      <!-- Budget Insights -->
+      <BudgetInsightCards :insights="budgetInsights" />
+
       <!-- Filters -->
       <Card class="mb-6">
         <CardHeader>
@@ -595,6 +598,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ButtonGroup, ButtonGroupSeparator } from '@/components/ui/button-group'
+import BudgetInsightCards from '@/components/BudgetInsightCards.vue'
 
 import type { Transaction, TransactionTableFilters, TransactionTableSort, TransactionFilters } from '~/types/transactions'
 
@@ -634,6 +638,7 @@ const { creditCards, initialize: initializeCreditCards } = useCreditCards()
 const { accounts, initialize: initializeAccounts } = useAccounts()
 const { subcategories, loadSubcategories } = useSubcategories()
 const { categories, initialize: initializeCategories } = useCategories()
+const { insights: budgetInsights, loadBudgetInsights } = useBudgets()
 
 // Helpers
 const getCurrentMonthDateRange = () => {
@@ -1089,7 +1094,8 @@ onMounted(async () => {
     initializeCreditCards(),
     initializeAccounts(),
     initializeCategories(),
-    loadSubcategories()
+    loadSubcategories(),
+    loadBudgetInsights()
   ])
   applyTableFilters(localFilters.value)
 })

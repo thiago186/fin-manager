@@ -1,8 +1,10 @@
 from typing import Any, Type
 
+from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import serializers
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -10,9 +12,11 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.models.budget import Budget
 from apps.accounts.serializers import (
+    BudgetInsightSerializer,
     BudgetListSerializer,
     BudgetSerializer,
 )
+from apps.accounts.services.budget_insight_service import BudgetInsightService
 
 
 class BudgetViewSet(ModelViewSet):
@@ -117,3 +121,34 @@ class BudgetViewSet(ModelViewSet):
     )
     def destroy(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=["budgets"],
+        summary="Budget insights",
+        description="Retrieve budget insights for the current month showing categories that have spent the threshold percentage or more of their budget.",
+        parameters=[
+            OpenApiParameter(
+                name="threshold",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Minimum percentage spent to include in results (default: 80, use 0 for all)",
+            ),
+        ],
+        responses={200: BudgetInsightSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="insights")
+    def insights(self, request: Request) -> Response:
+        """Return budget insights for the current month."""
+        user = request.user
+        assert isinstance(user, User)
+
+        threshold_param = request.query_params.get("threshold", "80")
+        try:
+            threshold = int(threshold_param)
+        except ValueError:
+            threshold = 80
+
+        service = BudgetInsightService(user=user)
+        data = service.get_insights(threshold_percentage=threshold)
+        serializer = BudgetInsightSerializer(data, many=True)
+        return Response(serializer.data)

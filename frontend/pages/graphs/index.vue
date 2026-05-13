@@ -6,6 +6,11 @@
       <p class="mt-1 text-sm text-gray-500">Visualize despesas por categoria ao longo do ano</p>
     </div>
 
+    <!-- Budget Insights -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <BudgetInsightCards :insights="budgetInsights" :show-all="true" />
+    </div>
+
     <!-- Error State -->
     <div v-if="error" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
       <Alert variant="destructive">
@@ -199,13 +204,14 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import BudgetInsightCards from '@/components/BudgetInsightCards.vue'
 
 definePageMeta({ middleware: 'auth' })
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, LineElement, PointElement, LineController, CategoryScale, LinearScale)
 
 const { data, loading, error, loadMonthlyByCategory } = useGraphs()
-const { budgets, loadBudgets } = useBudgets()
+const { budgets, loadBudgets, insights: budgetInsights, loadBudgetInsights } = useBudgets()
 
 const currentYear = new Date().getFullYear()
 const selectedYear = ref(String(currentYear))
@@ -430,7 +436,7 @@ function formatCurrency(value: number): string {
 
 watch(selectedYear, async (year) => {
   if (year) {
-    await Promise.all([loadMonthlyByCategory(Number(year)), loadBudgets()])
+    await Promise.all([loadMonthlyByCategory(Number(year)), loadBudgets(), loadBudgetInsights(0)])
     if (data.value) {
       const next: Record<number, boolean> = {}
       for (const cat of data.value.categories) {
@@ -445,7 +451,7 @@ watch(selectedYear, async (year) => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadMonthlyByCategory(Number(selectedYear.value)), loadBudgets()])
+  await Promise.all([loadMonthlyByCategory(Number(selectedYear.value)), loadBudgets(), loadBudgetInsights(0)])
   if (data.value) {
     const next: Record<number, boolean> = {}
     for (const cat of data.value.categories) {

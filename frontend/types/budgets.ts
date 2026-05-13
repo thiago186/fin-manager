@@ -42,6 +42,15 @@ export interface BudgetForm {
   is_active: boolean
 }
 
+export interface BudgetInsight {
+  category: BudgetCategory
+  budget_amount: string
+  spent_amount: string
+  percentage: number
+  status: 'safe' | 'warning' | 'critical' | 'over-budget'
+  remaining_amount: string
+}
+
 export interface BudgetApiResult<T> {
   success: boolean
   data?: T

@@ -47,3 +47,14 @@ class BudgetListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Budget
         fields = ["id", "category", "amount", "is_active", "created_at", "updated_at"]
+
+
+class BudgetInsightSerializer(serializers.Serializer):
+    """Serializer for budget insight data."""
+
+    category = CategoryNestedSerializer()
+    budget_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    spent_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    percentage = serializers.FloatField()
+    status = serializers.CharField()
+    remaining_amount = serializers.DecimalField(max_digits=12, decimal_places=2)

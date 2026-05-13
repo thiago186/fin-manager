@@ -6,13 +6,16 @@ import type {
   UpdateBudgetRequest,
   BudgetApiResult,
   Budget,
+  BudgetInsight,
 } from '~/types/budgets'
 
 export const useBudgets = () => {
   const config = useRuntimeConfig()
 
   const budgets = ref<BudgetList[]>([])
+  const insights = ref<BudgetInsight[]>([])
   const loading = ref(false)
+  const loadingInsights = ref(false)
   const error = ref<string | null>(null)
 
   const loadBudgets = async (filters?: BudgetFilters): Promise<BudgetApiResult<BudgetList[]>> => {
@@ -128,6 +131,34 @@ export const useBudgets = () => {
     }
   }
 
+  const loadBudgetInsights = async (threshold: number = 80): Promise<BudgetApiResult<BudgetInsight[]>> => {
+    loadingInsights.value = true
+    error.value = null
+
+    try {
+      const params = new URLSearchParams()
+      params.append('threshold', String(threshold))
+
+      const response = await $fetch<BudgetInsight[]>(`/finance/budgets/insights/?${params}`, {
+        baseURL: config.public.apiBase,
+        credentials: 'include',
+      })
+
+      insights.value = response
+      return { success: true, data: response }
+    } catch (err: any) {
+      const errorMessage = err?.data?.message || 'Failed to load budget insights'
+      error.value = errorMessage
+      console.error('Error loading budget insights:', err)
+      return {
+        success: false,
+        error: { message: errorMessage, code: err?.status?.toString() },
+      }
+    } finally {
+      loadingInsights.value = false
+    }
+  }
+
   const formatBudgetData = (form: BudgetForm): CreateBudgetRequest | UpdateBudgetRequest => {
     return {
       category_id: Number(form.category_id),
@@ -142,10 +173,13 @@ export const useBudgets = () => {
 
   return {
     budgets: readonly(budgets),
+    insights: readonly(insights),
     loading: readonly(loading),
+    loadingInsights: readonly(loadingInsights),
     error: readonly(error),
 
     loadBudgets,
+    loadBudgetInsights,
     createBudget,
     updateBudget,
     deleteBudget,

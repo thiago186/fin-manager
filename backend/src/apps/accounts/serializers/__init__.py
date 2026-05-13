@@ -1,4 +1,5 @@
 from .budget import (
+    BudgetInsightSerializer,
     BudgetListSerializer,
     BudgetSerializer,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "AccountSerializer",
     "BudgetSerializer",
     "BudgetListSerializer",
+    "BudgetInsightSerializer",
     "CashFlowGroupSerializer",
     "CashFlowReportSerializer",
     "CashFlowResultSerializer",
